@@ -14,10 +14,10 @@ import (
 
 type FileRepo struct {
 	pool  *pgxpool.Pool
-	store storage.Store
+	store *storage.OpenDALStore
 }
 
-func NewFileRepo(pool *pgxpool.Pool, store storage.Store) *FileRepo {
+func NewFileRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *FileRepo {
 	return &FileRepo{pool: pool, store: store}
 }
 

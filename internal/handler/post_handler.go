@@ -13,13 +13,13 @@ import (
 )
 
 type PostHandler struct {
-	posts  *repository.PostRepo
-	files  *repository.FileRepo
+	posts   *repository.PostRepo
+	files   *repository.FileRepo
 	artists *repository.ArtistRepo
-	store  storage.Store
+	store   *storage.OpenDALStore
 }
 
-func NewPostHandler(posts *repository.PostRepo, files *repository.FileRepo, artists *repository.ArtistRepo, store storage.Store) *PostHandler {
+func NewPostHandler(posts *repository.PostRepo, files *repository.FileRepo, artists *repository.ArtistRepo, store *storage.OpenDALStore) *PostHandler {
 	return &PostHandler{posts: posts, files: files, artists: artists, store: store}
 }
 
@@ -45,10 +45,8 @@ func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	id, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -69,10 +67,8 @@ func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) GetAdjacent(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	id, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -117,10 +113,8 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -143,10 +137,8 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -164,10 +156,8 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	postID, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -221,10 +211,8 @@ func (h *PostHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) RemoveMedia(w http.ResponseWriter, r *http.Request) {
-	mediaIDStr := chi.URLParam(r, "mediaId")
-	mediaID, err := uuid.Parse(mediaIDStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid media id")
+	mediaID, ok := parseParamID(w, r, "mediaId", "invalid media id")
+	if !ok {
 		return
 	}
 
@@ -236,10 +224,8 @@ func (h *PostHandler) RemoveMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) ReorderMedia(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	postID, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -259,10 +245,8 @@ func (h *PostHandler) ReorderMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	postID, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -314,10 +298,8 @@ func (h *PostHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) RemoveAttachment(w http.ResponseWriter, r *http.Request) {
-	attIDStr := chi.URLParam(r, "attId")
-	attID, err := uuid.Parse(attIDStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid attachment id")
+	attID, ok := parseParamID(w, r, "attId", "invalid attachment id")
+	if !ok {
 		return
 	}
 

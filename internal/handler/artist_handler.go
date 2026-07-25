@@ -9,16 +9,15 @@ import (
 	"ekokan/internal/storage"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type ArtistHandler struct {
 	repo  *repository.ArtistRepo
 	files *repository.FileRepo
-	store storage.Store
+	store *storage.OpenDALStore
 }
 
-func NewArtistHandler(repo *repository.ArtistRepo, files *repository.FileRepo, store storage.Store) *ArtistHandler {
+func NewArtistHandler(repo *repository.ArtistRepo, files *repository.FileRepo, store *storage.OpenDALStore) *ArtistHandler {
 	return &ArtistHandler{repo: repo, files: files, store: store}
 }
 
@@ -73,10 +72,8 @@ func (h *ArtistHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArtistHandler) Update(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -99,10 +96,8 @@ func (h *ArtistHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArtistHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -114,10 +109,8 @@ func (h *ArtistHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArtistHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -161,10 +154,8 @@ func (h *ArtistHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArtistHandler) UploadBanner(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 

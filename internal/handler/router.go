@@ -15,11 +15,11 @@ import (
 )
 
 type Deps struct {
-	Store     storage.Store
+	Store     *storage.OpenDALStore
 	Files     *repository.FileRepo
 	Artists   *repository.ArtistRepo
 	Posts     *repository.PostRepo
-	Tags     *repository.TagRepo
+	Tags      *repository.TagRepo
 	Comments  *repository.CommentRepo
 	StaticDir string
 }

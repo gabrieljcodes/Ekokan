@@ -18,16 +18,6 @@ import (
 	s3Service "github.com/apache/opendal-go-services/s3"
 )
 
-// Store provides an abstraction over file storage backends using Apache OpenDAL.
-type Store interface {
-	Put(ctx context.Context, key string, data []byte) error
-	Get(ctx context.Context, key string) ([]byte, error)
-	Delete(ctx context.Context, key string) error
-	Exists(ctx context.Context, key string) (bool, error)
-	PublicURL(key string) string
-	ServeFile(w http.ResponseWriter, r *http.Request, key string)
-}
-
 type OpenDALStore struct {
 	op      *opendal.Operator
 	backend string
@@ -35,7 +25,7 @@ type OpenDALStore struct {
 }
 
 // NewStore creates a storage backend using Apache OpenDAL based on config.
-func NewStore(cfg *config.Config) (Store, error) {
+func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 	var options map[string]string
 	var scheme opendal.Scheme
 
@@ -141,7 +131,7 @@ type UploadResult struct {
 }
 
 // ProcessUpload reads the file, hashes it, stores it via OpenDAL, and returns metadata.
-func ProcessUpload(ctx context.Context, store Store, filename string, reader io.Reader) (*UploadResult, error) {
+func ProcessUpload(ctx context.Context, store *OpenDALStore, filename string, reader io.Reader) (*UploadResult, error) {
 	hash, data, err := HashReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("hashing upload: %w", err)

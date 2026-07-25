@@ -15,10 +15,10 @@ import (
 
 type PostRepo struct {
 	pool  *pgxpool.Pool
-	store storage.Store
+	store *storage.OpenDALStore
 }
 
-func NewPostRepo(pool *pgxpool.Pool, store storage.Store) *PostRepo {
+func NewPostRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *PostRepo {
 	return &PostRepo{pool: pool, store: store}
 }
 

@@ -15,10 +15,10 @@ import (
 
 type ArtistRepo struct {
 	pool  *pgxpool.Pool
-	store storage.Store
+	store *storage.OpenDALStore
 }
 
-func NewArtistRepo(pool *pgxpool.Pool, store storage.Store) *ArtistRepo {
+func NewArtistRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *ArtistRepo {
 	return &ArtistRepo{pool: pool, store: store}
 }
 

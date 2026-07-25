@@ -9,12 +9,6 @@ import (
 	"strings"
 )
 
-// HashReader reads all bytes and returns the SHA-256 hex digest along with the data.
-func HashBytes(data []byte) string {
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:])
-}
-
 // HashReader computes SHA-256 of an io.Reader, returning the hash and all read bytes.
 func HashReader(r io.Reader) (string, []byte, error) {
 	h := sha256.New()

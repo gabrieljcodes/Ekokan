@@ -4,6 +4,7 @@
 data/
 *.exe
 ekokan-server
+server
 *.out
 *.test
 tmp/

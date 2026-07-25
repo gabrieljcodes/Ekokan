@@ -8,7 +8,6 @@ import (
 	"ekokan/internal/repository"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type TagHandler struct {
@@ -74,10 +73,8 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := parseParamID(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -99,10 +96,8 @@ func NewCommentHandler(comments *repository.CommentRepo) *CommentHandler {
 }
 
 func (h *CommentHandler) ListByPost(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	postID, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -115,10 +110,8 @@ func (h *CommentHandler) ListByPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	postID, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid post id")
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
 		return
 	}
 
@@ -143,10 +136,8 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "commentId")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid comment id")
+	id, ok := parseParamID(w, r, "commentId", "invalid comment id")
+	if !ok {
 		return
 	}
 

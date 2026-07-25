@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // JSON response helpers
@@ -29,3 +32,20 @@ func parsePageParams(r *http.Request) (page, perPage int) {
 	}
 	return
 }
+
+func parseParamID(w http.ResponseWriter, r *http.Request, param string, errMsg ...string) (uuid.UUID, bool) {
+	idStr := chi.URLParam(r, param)
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		msg := "invalid id"
+		if len(errMsg) > 0 && errMsg[0] != "" {
+			msg = errMsg[0]
+		} else if param != "id" {
+			msg = "invalid " + param
+		}
+		writeError(w, http.StatusBadRequest, msg)
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
