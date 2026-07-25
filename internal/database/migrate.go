@@ -20,19 +20,15 @@ func RunMigrations(databaseURL string) error {
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		version, dirty, verr := m.Version()
 		if verr == nil && dirty {
-			slog.Warn("database is in a dirty state, attempting to force clean version and re-apply", "version", version)
-			if forceErr := m.Force(int(version)); forceErr == nil {
-				if retryErr := m.Up(); retryErr == nil || errors.Is(retryErr, migrate.ErrNoChange) {
-					slog.Info("migrations successfully recovered and applied", "version", version)
-					return nil
-				}
-			}
+			slog.Error("database migration failed and is in a dirty state. Manual administrative intervention is required to inspect failed DDL before forcing version.", "version", version, "error", err)
 		}
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
 	version, dirty, _ := m.Version()
-	slog.Info("migrations applied", "version", version, "dirty", dirty)
+	slog.Info("migrations successfully synchronized", "version", version, "dirty", dirty)
 
 	return nil
 }
+
+

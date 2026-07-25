@@ -11,18 +11,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_artists_updated_at ON artists;
 CREATE TRIGGER trg_artists_updated_at
     BEFORE UPDATE ON artists
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_posts_updated_at ON posts;
 CREATE TRIGGER trg_posts_updated_at
     BEFORE UPDATE ON posts
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_comments_updated_at ON comments;
 CREATE TRIGGER trg_comments_updated_at
     BEFORE UPDATE ON comments
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
@@ -44,6 +48,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_posts_artist_count ON posts;
 CREATE TRIGGER trg_posts_artist_count
     AFTER INSERT OR DELETE ON posts
     FOR EACH ROW EXECUTE FUNCTION fn_artists_post_count();
@@ -65,6 +70,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_post_media_count ON post_media;
 CREATE TRIGGER trg_post_media_count
     AFTER INSERT OR DELETE ON post_media
     FOR EACH ROW EXECUTE FUNCTION fn_posts_media_count();
@@ -86,6 +92,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_post_attachment_count ON post_attachments;
 CREATE TRIGGER trg_post_attachment_count
     AFTER INSERT OR DELETE ON post_attachments
     FOR EACH ROW EXECUTE FUNCTION fn_posts_attachment_count();
@@ -107,6 +114,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_post_comment_count ON comments;
 CREATE TRIGGER trg_post_comment_count
     AFTER INSERT OR DELETE ON comments
     FOR EACH ROW EXECUTE FUNCTION fn_posts_comment_count();
@@ -128,6 +136,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_post_tags_count ON post_tags;
 CREATE TRIGGER trg_post_tags_count
     AFTER INSERT OR DELETE ON post_tags
     FOR EACH ROW EXECUTE FUNCTION fn_tags_post_count();
@@ -149,26 +158,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Note: ref_count starts at 1 on insert into files table.
--- These triggers handle subsequent references from post_media/post_attachments.
--- The first reference (when the file is created) sets ref_count=1.
--- Additional references via post_media/post_attachments increment from there.
--- We actually want ref_count to track total references, so we start at 0 in files
--- and let the triggers handle all counting.
-
--- Actually, let's adjust: files.ref_count DEFAULT 0, and triggers on both tables handle it.
--- But since the migration already set DEFAULT 1... let's keep it simple:
--- ref_count tracks how many post_media + post_attachments reference this file.
--- It starts at 0 and gets incremented by triggers.
--- We need to change the default in a separate step.
-
--- For now, these triggers track additional references beyond the first.
--- The cleanup job checks ref_count <= 0 to find orphaned files.
-
+DROP TRIGGER IF EXISTS trg_post_media_file_ref ON post_media;
 CREATE TRIGGER trg_post_media_file_ref
     AFTER INSERT OR DELETE ON post_media
     FOR EACH ROW EXECUTE FUNCTION fn_file_ref_count();
 
+DROP TRIGGER IF EXISTS trg_post_attachments_file_ref ON post_attachments;
 CREATE TRIGGER trg_post_attachments_file_ref
     AFTER INSERT OR DELETE ON post_attachments
     FOR EACH ROW EXECUTE FUNCTION fn_file_ref_count();

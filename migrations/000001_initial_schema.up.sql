@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- ============================================================
 -- files: Central file registry with SHA-256 deduplication
 -- ============================================================
-CREATE TABLE files (
+CREATE TABLE IF NOT EXISTS files (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sha256          CHAR(64) NOT NULL,
     file_path       TEXT NOT NULL,
@@ -24,13 +24,13 @@ CREATE TABLE files (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_files_sha256 ON files (sha256);
-CREATE INDEX idx_files_mime_type ON files (mime_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_sha256 ON files (sha256);
+CREATE INDEX IF NOT EXISTS idx_files_mime_type ON files (mime_type);
 
 -- ============================================================
 -- users: Prepared for future authentication
 -- ============================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username        TEXT NOT NULL,
     email           TEXT,
@@ -43,13 +43,13 @@ CREATE TABLE users (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_users_username ON users (username);
-CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL;
 
 -- ============================================================
 -- artists: Creator profiles
 -- ============================================================
-CREATE TABLE artists (
+CREATE TABLE IF NOT EXISTS artists (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
     name            TEXT NOT NULL,
@@ -63,14 +63,14 @@ CREATE TABLE artists (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_artists_slug ON artists (slug);
-CREATE INDEX idx_artists_user_id ON artists (user_id) WHERE user_id IS NOT NULL;
-CREATE INDEX idx_artists_name ON artists USING gin (name gin_trgm_ops);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_artists_slug ON artists (slug);
+CREATE INDEX IF NOT EXISTS idx_artists_user_id ON artists (user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_artists_name ON artists USING gin (name gin_trgm_ops);
 
 -- ============================================================
 -- posts: Content entries belonging to an artist
 -- ============================================================
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     artist_id        UUID NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
     title            TEXT NOT NULL,
@@ -86,14 +86,14 @@ CREATE TABLE posts (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_posts_artist_slug ON posts (artist_id, slug);
-CREATE INDEX idx_posts_artist_published ON posts (artist_id, published_at DESC);
-CREATE INDEX idx_posts_published ON posts (published_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_artist_slug ON posts (artist_id, slug);
+CREATE INDEX IF NOT EXISTS idx_posts_artist_published ON posts (artist_id, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_published ON posts (published_at DESC);
 
 -- ============================================================
 -- post_media: Junction between posts and files (visual media)
 -- ============================================================
-CREATE TABLE post_media (
+CREATE TABLE IF NOT EXISTS post_media (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     file_id     UUID NOT NULL REFERENCES files(id) ON DELETE RESTRICT,
@@ -102,13 +102,13 @@ CREATE TABLE post_media (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_post_media_post ON post_media (post_id, sort_order);
-CREATE UNIQUE INDEX idx_post_media_post_file ON post_media (post_id, file_id);
+CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media (post_id, sort_order);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_post_media_post_file ON post_media (post_id, file_id);
 
 -- ============================================================
 -- post_attachments: Junction between posts and files (downloads)
 -- ============================================================
-CREATE TABLE post_attachments (
+CREATE TABLE IF NOT EXISTS post_attachments (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id       UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     file_id       UUID NOT NULL REFERENCES files(id) ON DELETE RESTRICT,
@@ -116,13 +116,13 @@ CREATE TABLE post_attachments (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_post_attachments_post ON post_attachments (post_id);
-CREATE UNIQUE INDEX idx_post_attachments_post_file ON post_attachments (post_id, file_id);
+CREATE INDEX IF NOT EXISTS idx_post_attachments_post ON post_attachments (post_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_post_attachments_post_file ON post_attachments (post_id, file_id);
 
 -- ============================================================
 -- tags: With categories for organization
 -- ============================================================
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL,
     slug        TEXT NOT NULL,
@@ -131,25 +131,25 @@ CREATE TABLE tags (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_tags_slug ON tags (slug);
-CREATE INDEX idx_tags_category ON tags (category);
-CREATE INDEX idx_tags_post_count ON tags (post_count DESC) WHERE post_count > 0;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_slug ON tags (slug);
+CREATE INDEX IF NOT EXISTS idx_tags_category ON tags (category);
+CREATE INDEX IF NOT EXISTS idx_tags_post_count ON tags (post_count DESC) WHERE post_count > 0;
 
 -- ============================================================
 -- post_tags: Junction between posts and tags
 -- ============================================================
-CREATE TABLE post_tags (
+CREATE TABLE IF NOT EXISTS post_tags (
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     tag_id  UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (post_id, tag_id)
 );
 
-CREATE INDEX idx_post_tags_tag ON post_tags (tag_id);
+CREATE INDEX IF NOT EXISTS idx_post_tags_tag ON post_tags (tag_id);
 
 -- ============================================================
 -- comments: Threaded comments on posts
 -- ============================================================
-CREATE TABLE comments (
+CREATE TABLE IF NOT EXISTS comments (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -161,26 +161,26 @@ CREATE TABLE comments (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_comments_post ON comments (post_id, created_at);
-CREATE INDEX idx_comments_parent ON comments (parent_id) WHERE parent_id IS NOT NULL;
-CREATE INDEX idx_comments_user ON comments (user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_comments_post ON comments (post_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments (parent_id) WHERE parent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_comments_user ON comments (user_id) WHERE user_id IS NOT NULL;
 
 -- ============================================================
 -- favorites: User bookmarks (future, requires auth)
 -- ============================================================
-CREATE TABLE favorites (
+CREATE TABLE IF NOT EXISTS favorites (
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, post_id)
 );
 
-CREATE INDEX idx_favorites_post ON favorites (post_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_post ON favorites (post_id);
 
 -- ============================================================
 -- flags: Report system (future, requires auth)
 -- ============================================================
-CREATE TABLE flags (
+CREATE TABLE IF NOT EXISTS flags (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
     post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -190,7 +190,7 @@ CREATE TABLE flags (
     resolved_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_flags_post ON flags (post_id);
-CREATE INDEX idx_flags_status ON flags (status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_flags_post ON flags (post_id);
+CREATE INDEX IF NOT EXISTS idx_flags_status ON flags (status) WHERE status = 'pending';
 
 COMMIT;
