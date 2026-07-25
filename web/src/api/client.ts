@@ -57,6 +57,9 @@ export const api = {
   uploadBanner: (id: string, file: globalThis.File) =>
     uploadFile<Artist>(`/api/artists/${id}/banner`, file),
 
+  deleteArtist: (id: string) =>
+    request<void>(`/api/artists/${id}`, { method: 'DELETE' }),
+
   // Posts
   listArtistPosts: (slug: string, page = 1, perPage = 25) =>
     request<PaginatedResult<Post>>(`/api/artists/${slug}/posts?page=${page}&per_page=${perPage}`),
@@ -106,4 +109,8 @@ export const api = {
 
   createTag: (data: { name: string; category?: string }) =>
     request<Tag>('/api/tags', { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteTag: (id: string) =>
+    request<void>(`/api/tags/${id}`, { method: 'DELETE' }),
 };
+

@@ -100,16 +100,21 @@ export default function ArtistPage() {
 
         {activeTab === 'posts' && (
           <>
-            {/* Search posts */}
-            <div className="search-bar">
-              <span className="search-bar__icon">🔍</span>
-              <input
-                type="text"
-                className="search-bar__input"
-                placeholder="Search posts..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            {/* Search and action bar */}
+            <div className="action-bar">
+              <div className="search-bar" style={{ margin: 0, flex: 1, maxWidth: '500px' }}>
+                <span className="search-bar__icon">🔍</span>
+                <input
+                  type="text"
+                  className="search-bar__input"
+                  placeholder="Search artist's posts..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Link to={`/posts/new?artist=${artist.slug}`} className="btn-primary">
+                📤 + Upload Post for {artist.name}
+              </Link>
             </div>
 
             {/* Posts grid */}
@@ -130,16 +135,31 @@ export default function ArtistPage() {
               </>
             ) : (
               <div className="empty-state">
-                {search ? 'No posts match your search' : 'No posts yet'}
+                {search ? 'No posts match your search' : (
+                  <div style={{ padding: '2rem 0' }}>
+                    <p style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontSize: 'var(--fs-md)', fontWeight: 500 }}>
+                      No art works archived under {artist.name} yet!
+                    </p>
+                    <Link to={`/posts/new?artist=${artist.slug}`} className="btn-primary">
+                      📤 + Upload First Post
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
 
         {activeTab === 'tags' && (
-          <div className="empty-state">Tags view coming soon</div>
+          <div className="empty-state">
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
+              Manage all categorization systems and colored tags in the centralized library.
+            </p>
+            <Link to="/tags" className="btn-secondary">Open Tag Library →</Link>
+          </div>
         )}
       </div>
     </div>
   );
 }
+

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist, PaginatedResult } from '../types/models';
 import ArtistCard from '../components/ArtistCard';
@@ -25,15 +26,20 @@ export default function Dashboard() {
 
   return (
     <div className="app-container">
-      <div className="search-bar">
-        <span className="search-bar__icon">🔍</span>
-        <input
-          type="text"
-          className="search-bar__input"
-          placeholder="Search artists..."
-          value={search}
-          onChange={handleSearch}
-        />
+      <div className="action-bar">
+        <div className="search-bar" style={{ margin: 0, flex: 1, maxWidth: '600px' }}>
+          <span className="search-bar__icon">🔍</span>
+          <input
+            type="text"
+            className="search-bar__input"
+            placeholder="Search artists..."
+            value={search}
+            onChange={handleSearch}
+          />
+        </div>
+        <Link to="/artists/new" className="btn-primary">
+          ✨ + Add Artist Profile
+        </Link>
       </div>
 
       {loading ? (
@@ -53,9 +59,20 @@ export default function Dashboard() {
         </>
       ) : (
         <div className="empty-state">
-          {search ? 'No artists found' : 'No artists yet'}
+          {search ? 'No artists found match your search' : (
+            <div style={{ padding: '2rem 0' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎨</div>
+              <p style={{ marginBottom: '1.5rem', fontSize: 'var(--fs-md)', color: 'var(--text-primary)', fontWeight: 500 }}>
+                Your personal Ekokan archive is empty!
+              </p>
+              <Link to="/artists/new" className="btn-primary" style={{ padding: '12px 24px', fontSize: '15px' }}>
+                + Create First Artist Profile
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
