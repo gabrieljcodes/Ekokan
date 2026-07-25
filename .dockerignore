@@ -1,0 +1,21 @@
+# Node & Frontend
+web/node_modules
+web/dist
+web/.vite
+
+# Go binaries & data
+data/
+*.exe
+ekokan-server
+
+# Docker & Git
+.git
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Env & IDE
+.env
+.env.local
+.idea/
+.vscode/
