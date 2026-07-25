@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { Comment } from '../types/models';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   postId: string;
@@ -23,10 +24,20 @@ function formatDate(dateStr: string): string {
 }
 
 function CommentItem({ comment }: { comment: Comment }) {
+  const isMember = comment.is_member || !!comment.user_id;
+  const isAdmin = comment.author_role === 'admin';
+
   return (
-    <div className="comment">
-      <div className="comment__header">
-        <span className="comment__author">{comment.author_name}</span>
+    <div className={`comment ${isMember ? 'comment-item--member' : ''}`}>
+      <div className="comment__header" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span className="comment__author" style={isMember ? { color: 'var(--accent)', fontWeight: '700' } : {}}>
+          {comment.author_name}
+        </span>
+        {isAdmin ? (
+          <span className="member-badge" style={{ borderColor: '#ff6b6b', color: '#ff6b6b' }}>Admin</span>
+        ) : isMember ? (
+          <span className="member-badge">Member</span>
+        ) : null}
         <span className="comment__date">{formatDate(comment.created_at)}</span>
         {comment.is_edited && <span className="comment__date">(edited)</span>}
       </div>
@@ -43,6 +54,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 }
 
 export default function CommentSection({ postId, comments, onCommentAdded }: Props) {
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +66,7 @@ export default function CommentSection({ postId, comments, onCommentAdded }: Pro
     setSubmitting(true);
     try {
       await api.createComment(postId, {
-        author_name: name.trim() || undefined,
+        author_name: user ? (user.display_name || user.username) : (name.trim() || undefined),
         content: content.trim(),
       });
       setContent('');
@@ -73,15 +85,22 @@ export default function CommentSection({ postId, comments, onCommentAdded }: Pro
       </h3>
 
       <form className="comment-form" onSubmit={handleSubmit}>
-        <div className="comment-form__row">
-          <input
-            type="text"
-            placeholder="Name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ flex: 1 }}
-          />
-        </div>
+        {user ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-sm)', color: 'var(--accent)', fontWeight: '600' }}>
+            <span>👤 Commenting as authenticated Member: <strong>{user.display_name || user.username}</strong></span>
+            <span className="member-badge">Member</span>
+          </div>
+        ) : (
+          <div className="comment-form__row">
+            <input
+              type="text"
+              placeholder="Name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+        )}
         <textarea
           placeholder="Write a comment..."
           value={content}
@@ -103,3 +122,4 @@ export default function CommentSection({ postId, comments, onCommentAdded }: Pro
     </div>
   );
 }
+

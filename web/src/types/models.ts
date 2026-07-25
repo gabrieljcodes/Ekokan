@@ -29,6 +29,18 @@ export interface Artist {
   updated_at: string;
   avatar_url?: string;
   banner_url?: string;
+  favorite_count?: number;
+  is_favorited?: boolean;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  email?: string;
+  display_name?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface PostMedia {
@@ -77,6 +89,8 @@ export interface Post {
   media?: PostMedia[];
   attachments?: PostAttachment[];
   tags?: Tag[];
+  favorite_count?: number;
+  is_favorited?: boolean;
 }
 
 export interface Comment {
@@ -89,6 +103,8 @@ export interface Comment {
   is_edited: boolean;
   created_at: string;
   updated_at: string;
+  author_role?: string;
+  is_member?: boolean;
   replies?: Comment[];
 }
 

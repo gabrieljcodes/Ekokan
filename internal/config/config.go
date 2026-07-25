@@ -10,6 +10,8 @@ type Config struct {
 	Port        int
 	DatabaseURL string
 	CORSOrigins string
+	JWTSecret   string
+	AllowPublicReg bool
 
 	// Storage
 	StorageBackend string // "fs" or "s3"
@@ -36,6 +38,8 @@ func Load() (*Config, error) {
 		Port:           getEnvInt("PORT", 8080),
 		DatabaseURL:    getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/ekokan?sslmode=disable"),
 		CORSOrigins:    getEnv("CORS_ORIGINS", "*"),
+		JWTSecret:      getEnv("JWT_SECRET", "ekokan-dev-default-secret-key-do-not-use-in-prod"),
+		AllowPublicReg: getEnvBool("ALLOW_PUBLIC_REGISTRATION", true),
 		StorageBackend: getEnv("STORAGE_BACKEND", "fs"),
 		StorageFSRoot:  getEnv("STORAGE_FS_ROOT", "./data/media"),
 		S3Bucket:       getEnv("S3_BUCKET", ""),
@@ -81,3 +85,13 @@ func getEnvInt(key string, fallback int) int {
 	}
 	return fallback
 }
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return fallback
+}
+

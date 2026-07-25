@@ -21,10 +21,14 @@ func NewCommentRepo(pool *pgxpool.Pool) *CommentRepo {
 
 func (r *CommentRepo) ListByPost(ctx context.Context, postID uuid.UUID) ([]models.Comment, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, post_id, user_id, parent_id, author_name, content, is_edited, created_at, updated_at
-		FROM comments
-		WHERE post_id = $1
-		ORDER BY created_at ASC
+		SELECT c.id, c.post_id, c.user_id, c.parent_id, 
+		       COALESCE(u.display_name, u.username, c.author_name), 
+		       c.content, c.is_edited, c.created_at, c.updated_at,
+		       u.role
+		FROM comments c
+		LEFT JOIN users u ON c.user_id = u.id
+		WHERE c.post_id = $1
+		ORDER BY c.created_at ASC
 	`, postID)
 	if err != nil {
 		return nil, fmt.Errorf("listing comments: %w", err)
@@ -37,8 +41,12 @@ func (r *CommentRepo) ListByPost(ctx context.Context, postID uuid.UUID) ([]model
 		if err := rows.Scan(
 			&c.ID, &c.PostID, &c.UserID, &c.ParentID, &c.AuthorName,
 			&c.Content, &c.IsEdited, &c.CreatedAt, &c.UpdatedAt,
+			&c.AuthorRole,
 		); err != nil {
 			return nil, err
+		}
+		if c.UserID != nil {
+			c.IsMember = true
 		}
 		all = append(all, c)
 	}
@@ -79,27 +87,31 @@ func buildCommentTree(flat []models.Comment) []models.Comment {
 
 type CreateCommentInput struct {
 	PostID     uuid.UUID  `json:"post_id"`
+	UserID     *uuid.UUID `json:"user_id,omitempty"`
 	ParentID   *uuid.UUID `json:"parent_id"`
 	AuthorName string     `json:"author_name"`
 	Content    string     `json:"content"`
 }
 
 func (r *CommentRepo) Create(ctx context.Context, input CreateCommentInput) (*models.Comment, error) {
-	if input.AuthorName == "" {
+	if input.AuthorName == "" && input.UserID == nil {
 		input.AuthorName = "Anonymous"
 	}
 
 	var c models.Comment
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO comments (post_id, parent_id, author_name, content)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO comments (post_id, user_id, parent_id, author_name, content)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, post_id, user_id, parent_id, author_name, content, is_edited, created_at, updated_at
-	`, input.PostID, input.ParentID, input.AuthorName, input.Content).Scan(
+	`, input.PostID, input.UserID, input.ParentID, input.AuthorName, input.Content).Scan(
 		&c.ID, &c.PostID, &c.UserID, &c.ParentID, &c.AuthorName,
 		&c.Content, &c.IsEdited, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating comment: %w", err)
+	}
+	if c.UserID != nil {
+		c.IsMember = true
 	}
 	c.Replies = []models.Comment{}
 	return &c, nil

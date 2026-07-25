@@ -50,8 +50,10 @@ type Artist struct {
 	UpdatedAt    time.Time  `json:"updated_at"`
 
 	// Joined fields
-	AvatarURL string `json:"avatar_url,omitempty"`
-	BannerURL string `json:"banner_url,omitempty"`
+	AvatarURL     string `json:"avatar_url,omitempty"`
+	BannerURL     string `json:"banner_url,omitempty"`
+	FavoriteCount int    `json:"favorite_count,omitempty"`
+	IsFavorited   bool   `json:"is_favorited,omitempty"`
 }
 
 type Post struct {
@@ -70,10 +72,12 @@ type Post struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 
 	// Joined fields
-	Artist      *Artist          `json:"artist,omitempty"`
-	Media       []PostMedia      `json:"media,omitempty"`
-	Attachments []PostAttachment `json:"attachments,omitempty"`
-	Tags        []Tag            `json:"tags,omitempty"`
+	Artist        *Artist          `json:"artist,omitempty"`
+	Media         []PostMedia      `json:"media,omitempty"`
+	Attachments   []PostAttachment `json:"attachments,omitempty"`
+	Tags          []Tag            `json:"tags,omitempty"`
+	FavoriteCount int              `json:"favorite_count,omitempty"`
+	IsFavorited   bool             `json:"is_favorited,omitempty"`
 }
 
 type PostMedia struct {
@@ -119,13 +123,21 @@ type Comment struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`
 
-	// Nested
-	Replies []Comment `json:"replies,omitempty"`
+	// Nested & enriched fields
+	AuthorRole *string   `json:"author_role,omitempty"`
+	IsMember   bool      `json:"is_member,omitempty"`
+	Replies    []Comment `json:"replies,omitempty"`
 }
 
 type Favorite struct {
 	UserID    uuid.UUID `json:"user_id"`
 	PostID    uuid.UUID `json:"post_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type ArtistFavorite struct {
+	UserID    uuid.UUID `json:"user_id"`
+	ArtistID  uuid.UUID `json:"artist_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

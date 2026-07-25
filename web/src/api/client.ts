@@ -1,12 +1,17 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('ekokan_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -17,6 +22,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: Record<string, string>): Promise<T> {
+  const token = localStorage.getItem('ekokan_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const form = new FormData();
   form.append('file', file);
   if (extraFields) {
@@ -26,6 +36,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   }
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
+    headers,
     body: form,
   });
   if (!res.ok) {
@@ -35,7 +46,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   return res.json();
 }
 
-import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment } from '../types/models';
+import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User } from '../types/models';
 
 export const api = {
   // Artists
@@ -112,5 +123,25 @@ export const api = {
 
   deleteTag: (id: string) =>
     request<void>(`/api/tags/${id}`, { method: 'DELETE' }),
+
+  // Auth
+  register: (data: { username: string; email?: string; password: string; display_name?: string }) =>
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+
+  login: (data: { username: string; password: string }) =>
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+
+  getMe: () =>
+    request<{ user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/me'),
+
+  // Favorites
+  togglePostFavorite: (postId: string) =>
+    request<{ is_favorited: boolean }>(`/api/posts/${postId}/favorite`, { method: 'POST' }),
+
+  toggleArtistFavorite: (artistId: string) =>
+    request<{ is_favorited: boolean }>(`/api/artists/${artistId}/favorite`, { method: 'POST' }),
+
+  listMyFavorites: () =>
+    request<{ artists: Artist[]; posts: Post[] }>('/api/users/me/favorites'),
 };
 

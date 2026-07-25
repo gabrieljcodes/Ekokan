@@ -4,10 +4,13 @@ import { api } from '../api/client';
 import type { Artist, Post, PaginatedResult } from '../types/models';
 import PostCard from '../components/PostCard';
 import Pagination from '../components/Pagination';
+import { useAuth } from '../context/AuthContext';
 
 export default function ArtistPage() {
   const { slug } = useParams<{ slug: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
+  const { user, isFavoriteArtist, toggleFavoriteArtist } = useAuth();
+  const favorited = artist ? (isFavoriteArtist(artist.id) || artist.is_favorited) : false;
   const [posts, setPosts] = useState<PaginatedResult<Post> | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -76,7 +79,19 @@ export default function ArtistPage() {
           </div>
         )}
         <div className="artist-profile__info">
-          <h1 className="artist-profile__name">{artist.name}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <h1 className="artist-profile__name" style={{ margin: 0 }}>{artist.name}</h1>
+            <button
+              onClick={async () => {
+                if (!user) { alert('Please login to favorite creators'); return; }
+                try { await toggleFavoriteArtist(artist.id); } catch (e) { console.error(e); }
+              }}
+              className={`btn-secondary ${favorited ? 'fav-btn--active' : ''}`}
+              style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)' }}
+            >
+              {favorited ? '⭐ Favorited Creator' : '☆ Favorite Creator'}
+            </button>
+          </div>
           {artist.bio && <p className="artist-profile__bio">{artist.bio}</p>}
         </div>
       </div>

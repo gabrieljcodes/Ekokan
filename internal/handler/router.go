@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ekokan/internal/auth"
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
 
@@ -15,13 +16,17 @@ import (
 )
 
 type Deps struct {
-	Store     *storage.OpenDALStore
-	Files     *repository.FileRepo
-	Artists   *repository.ArtistRepo
-	Posts     *repository.PostRepo
-	Tags      *repository.TagRepo
-	Comments  *repository.CommentRepo
-	StaticDir string
+	Store          *storage.OpenDALStore
+	Files          *repository.FileRepo
+	Artists        *repository.ArtistRepo
+	Posts          *repository.PostRepo
+	Tags           *repository.TagRepo
+	Comments       *repository.CommentRepo
+	Users          *repository.UserRepo
+	Favorites      *repository.FavoriteRepo
+	JWTSecret      string
+	AllowPublicReg bool
+	StaticDir      string
 }
 
 func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
@@ -46,9 +51,22 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Store)
 	tagH := NewTagHandler(deps.Tags, deps.Posts)
 	commentH := NewCommentHandler(deps.Comments)
+	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.JWTSecret, deps.AllowPublicReg)
+	favH := NewFavoriteHandler(deps.Favorites)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
+		r.Use(auth.OptionalAuth(deps.JWTSecret))
+
+		// Auth
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", authH.Register)
+			r.Post("/login", authH.Login)
+			r.Get("/me", authH.GetMe)
+		})
+
+		// User personal gallery
+		r.Get("/users/me/favorites", favH.ListMyFavorites)
 		// Artists
 		r.Route("/artists", func(r chi.Router) {
 			r.Get("/", artistH.List)
@@ -59,6 +77,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			r.Post("/{id}/avatar", artistH.UploadAvatar)
 			r.Post("/{id}/banner", artistH.UploadBanner)
 			r.Get("/{slug}/posts", postH.ListByArtist)
+			r.Post("/{id}/favorite", favH.ToggleArtistFavorite)
 		})
 
 		// Posts
@@ -69,6 +88,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			r.Post("/", postH.Create)
 			r.Put("/{id}", postH.Update)
 			r.Delete("/{id}", postH.Delete)
+			r.Post("/{id}/favorite", favH.TogglePostFavorite)
 
 			// Media
 			r.Post("/{id}/media", postH.UploadMedia)

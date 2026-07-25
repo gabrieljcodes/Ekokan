@@ -1,5 +1,7 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Post } from '../types/models';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   post: Post;
@@ -13,13 +15,37 @@ function formatDate(dateStr: string): string {
 
 export default function PostCard({ post, artistSlug }: Props) {
   const thumb = post.media?.[0]?.file;
+  const { user, isFavoritePost, toggleFavoritePost } = useAuth();
+  const favorited = isFavoritePost(post.id) || post.is_favorited;
+
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      alert('Please login to bookmark posts');
+      return;
+    }
+    try {
+      await toggleFavoritePost(post.id);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <Link
       to={`/artist/${artistSlug}/post/${post.id}`}
       className="post-card"
-      style={{ textDecoration: 'none' }}
+      style={{ textDecoration: 'none', position: 'relative' }}
     >
+      <button
+        onClick={handleFavorite}
+        className={`fav-btn ${favorited ? 'fav-btn--active' : ''}`}
+        style={{ position: 'absolute', top: '8px', right: '8px' }}
+        title={favorited ? 'Saved in favorites' : 'Bookmark post'}
+      >
+        {favorited ? '❤️' : '🤍'}
+      </button>
       {thumb?.url ? (
         <img
           src={thumb.url}
@@ -42,3 +68,4 @@ export default function PostCard({ post, artistSlug }: Props) {
     </Link>
   );
 }
+

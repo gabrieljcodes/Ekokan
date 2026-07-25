@@ -61,16 +61,22 @@ func main() {
 	postRepo := repository.NewPostRepo(pool, store)
 	tagRepo := repository.NewTagRepo(pool)
 	commentRepo := repository.NewCommentRepo(pool)
+	userRepo := repository.NewUserRepo(pool)
+	favoriteRepo := repository.NewFavoriteRepo(pool, store)
 
 	// Router
 	router := handler.NewRouter(handler.Deps{
-		Store:    store,
-		Files:    fileRepo,
-		Artists:  artistRepo,
-		Posts:    postRepo,
-		Tags:    tagRepo,
-		Comments:  commentRepo,
-		StaticDir: cfg.StaticDir,
+		Store:          store,
+		Files:          fileRepo,
+		Artists:        artistRepo,
+		Posts:          postRepo,
+		Tags:           tagRepo,
+		Comments:       commentRepo,
+		Users:          userRepo,
+		Favorites:      favoriteRepo,
+		JWTSecret:      cfg.JWTSecret,
+		AllowPublicReg: cfg.AllowPublicReg,
+		StaticDir:      cfg.StaticDir,
 	}, cfg.CORSOrigins)
 
 	// Server

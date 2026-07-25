@@ -6,6 +6,7 @@ import MediaViewer from '../components/MediaViewer';
 import TagList from '../components/TagList';
 import AttachmentList from '../components/AttachmentList';
 import CommentSection from '../components/CommentSection';
+import { useAuth } from '../context/AuthContext';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -15,6 +16,8 @@ function formatDate(dateStr: string): string {
 export default function PostPage() {
   const { slug, postId } = useParams<{ slug: string; postId: string }>();
   const [post, setPost] = useState<Post | null>(null);
+  const { user, isFavoritePost, toggleFavoritePost } = useAuth();
+  const favorited = post ? (isFavoritePost(post.id) || post.is_favorited) : false;
   const [adjacent, setAdjacent] = useState<AdjacentPosts>({});
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +112,19 @@ export default function PostPage() {
           </Link>
         )}
         <div className="post-header__info">
-          <h1 className="post-header__title">{post.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <h1 className="post-header__title" style={{ margin: 0 }}>{post.title}</h1>
+            <button
+              onClick={async () => {
+                if (!user) { alert('Please login to bookmark posts'); return; }
+                try { await toggleFavoritePost(post.id); } catch (e) { console.error(e); }
+              }}
+              className={`btn-secondary ${favorited ? 'fav-btn--active' : ''}`}
+              style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)' }}
+            >
+              {favorited ? '❤️ Bookmarked' : '🤍 Bookmark Post'}
+            </button>
+          </div>
           <div className="post-header__date">
             <span>Published:</span> {formatDate(post.published_at)}
           </div>

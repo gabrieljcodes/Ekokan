@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"ekokan/internal/auth"
 	"ekokan/internal/models"
 	"ekokan/internal/repository"
 
@@ -121,6 +122,9 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.PostID = postID
+	if userID, loggedIn := auth.GetUserID(r); loggedIn {
+		input.UserID = &userID
+	}
 
 	if input.Content == "" {
 		writeError(w, http.StatusBadRequest, "content is required")

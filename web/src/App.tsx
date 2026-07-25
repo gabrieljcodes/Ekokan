@@ -6,24 +6,34 @@ import PostPage from './pages/PostPage';
 import CreateArtistPage from './pages/CreateArtistPage';
 import CreatePostPage from './pages/CreatePostPage';
 import ManageTagsPage from './pages/ManageTagsPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import FavoritesPage from './pages/FavoritesPage';
+import { AuthProvider } from './context/AuthContext';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/artists/new" element={<CreateArtistPage />} />
-          <Route path="/posts/new" element={<CreatePostPage />} />
-          <Route path="/tags" element={<ManageTagsPage />} />
-          <Route path="/artist/:slug" element={<ArtistPage />} />
-          <Route path="/artist/:slug/post/new" element={<CreatePostPage />} />
-          <Route path="/artist/:slug/post/:postId" element={<PostPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/artists/new" element={<CreateArtistPage />} />
+            <Route path="/posts/new" element={<CreatePostPage />} />
+            <Route path="/tags" element={<ManageTagsPage />} />
+            <Route path="/artist/:slug" element={<ArtistPage />} />
+            <Route path="/artist/:slug/post/new" element={<CreatePostPage />} />
+            <Route path="/artist/:slug/post/:postId" element={<PostPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
 export default App;
+
 
