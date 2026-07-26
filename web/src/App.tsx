@@ -5,6 +5,7 @@ import ArtistPage from './pages/ArtistPage';
 import PostPage from './pages/PostPage';
 import CreateArtistPage from './pages/CreateArtistPage';
 import CreatePostPage from './pages/CreatePostPage';
+import EditPostPage from './pages/EditPostPage';
 import ManageTagsPage from './pages/ManageTagsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -23,10 +24,12 @@ function App() {
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/artists/new" element={<CreateArtistPage />} />
             <Route path="/posts/new" element={<CreatePostPage />} />
+            <Route path="/posts/:postId/edit" element={<EditPostPage />} />
             <Route path="/tags" element={<ManageTagsPage />} />
             <Route path="/artist/:slug" element={<ArtistPage />} />
             <Route path="/artist/:slug/post/new" element={<CreatePostPage />} />
             <Route path="/artist/:slug/post/:postId" element={<PostPage />} />
+            <Route path="/artist/:slug/post/:postId/edit" element={<EditPostPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

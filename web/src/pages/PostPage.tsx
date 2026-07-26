@@ -112,8 +112,8 @@ export default function PostPage() {
           </Link>
         )}
         <div className="post-header__info">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '8px' }}>
-            <h1 className="post-header__title" style={{ margin: 0 }}>{post.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <h1 className="post-header__title" style={{ margin: 0, marginRight: '8px' }}>{post.title}</h1>
             <button
               onClick={async () => {
                 if (!user) { alert('Please login to bookmark posts'); return; }
@@ -124,6 +124,14 @@ export default function PostPage() {
             >
               {favorited ? '❤️ Bookmarked' : '🤍 Bookmark Post'}
             </button>
+            <Link
+              to={`/artist/${slug}/post/${post.id}/edit`}
+              className="btn-secondary"
+              style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
+              title="Edit Post Details & Media"
+            >
+              ✏️ Edit Post
+            </Link>
           </div>
           <div className="post-header__date">
             <span>Published:</span> {formatDate(post.published_at)}
