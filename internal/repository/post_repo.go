@@ -91,16 +91,22 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Post, err
 }
 
 // GetAdjacentPosts returns the previous and next post for an artist, sorted by published_at.
-func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID, artistID uuid.UUID, publishedAt interface{}) (prev *models.Post, next *models.Post, err error) {
+func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID uuid.UUID) (prev *models.Post, next *models.Post, err error) {
+	var artistID uuid.UUID
+	var publishedAt time.Time
+	if err := r.pool.QueryRow(ctx, `SELECT artist_id, published_at FROM posts WHERE id = $1`, postID).Scan(&artistID, &publishedAt); err != nil {
+		return nil, nil, fmt.Errorf("getting post metadata for adjacent check: %w", err)
+	}
+
 	// Previous (older)
 	var prevPost models.Post
 	err = r.pool.QueryRow(ctx, `
 		SELECT id, title, slug, published_at
 		FROM posts
-		WHERE artist_id = $1 AND published_at < (SELECT published_at FROM posts WHERE id = $2)
+		WHERE artist_id = $1 AND published_at < $2
 		ORDER BY published_at DESC
 		LIMIT 1
-	`, artistID, postID).Scan(&prevPost.ID, &prevPost.Title, &prevPost.Slug, &prevPost.PublishedAt)
+	`, artistID, publishedAt).Scan(&prevPost.ID, &prevPost.Title, &prevPost.Slug, &prevPost.PublishedAt)
 	if err == nil {
 		prev = &prevPost
 	}
@@ -110,10 +116,10 @@ func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID, artistID uuid.U
 	err = r.pool.QueryRow(ctx, `
 		SELECT id, title, slug, published_at
 		FROM posts
-		WHERE artist_id = $1 AND published_at > (SELECT published_at FROM posts WHERE id = $2)
+		WHERE artist_id = $1 AND published_at > $2
 		ORDER BY published_at ASC
 		LIMIT 1
-	`, artistID, postID).Scan(&nextPost.ID, &nextPost.Title, &nextPost.Slug, &nextPost.PublishedAt)
+	`, artistID, publishedAt).Scan(&nextPost.ID, &nextPost.Title, &nextPost.Slug, &nextPost.PublishedAt)
 	if err == nil {
 		next = &nextPost
 	}

@@ -72,13 +72,11 @@ func (h *PostHandler) GetAdjacent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := h.posts.GetByID(r.Context(), id)
-	if err != nil || post == nil {
+	prev, next, err := h.posts.GetAdjacentPosts(r.Context(), id)
+	if err != nil {
 		writeError(w, http.StatusNotFound, "post not found")
 		return
 	}
-
-	prev, next, _ := h.posts.GetAdjacentPosts(r.Context(), id, post.ArtistID, post.PublishedAt)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"previous": prev,
 		"next":     next,
