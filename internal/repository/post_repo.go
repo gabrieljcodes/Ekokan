@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"ekokan/internal/models"
 	"ekokan/internal/storage"
@@ -121,23 +122,37 @@ func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID, artistID uuid.U
 }
 
 type CreatePostInput struct {
-	ArtistID    uuid.UUID `json:"artist_id"`
-	Title       string    `json:"title"`
-	Slug        string    `json:"slug"`
-	Content     string    `json:"content"`
-	SourceURL   *string   `json:"source_url"`
-	PublishedAt *string   `json:"published_at"`
+	ArtistID    uuid.UUID   `json:"artist_id"`
+	Title       string      `json:"title"`
+	Slug        string      `json:"slug"`
+	Content     string      `json:"content"`
+	SourceURL   *string     `json:"source_url"`
+	PublishedAt *time.Time  `json:"published_at"`
+	ImportedAt  *time.Time  `json:"imported_at"`
 	TagIDs      []uuid.UUID `json:"tag_ids"`
 }
 
 func (r *PostRepo) Create(ctx context.Context, input CreatePostInput) (*models.Post, error) {
+	publishedAt := time.Now()
+	if input.PublishedAt != nil && !input.PublishedAt.IsZero() {
+		publishedAt = *input.PublishedAt
+	}
+
+	var importedAt *time.Time
+	if input.ImportedAt != nil && !input.ImportedAt.IsZero() {
+		importedAt = input.ImportedAt
+	} else if input.SourceURL != nil && *input.SourceURL != "" {
+		now := time.Now()
+		importedAt = &now
+	}
+
 	var p models.Post
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO posts (artist_id, title, slug, content, source_url)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO posts (artist_id, title, slug, content, source_url, published_at, imported_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, artist_id, title, slug, content, source_url, published_at, imported_at,
 		          media_count, attachment_count, comment_count, created_at, updated_at
-	`, input.ArtistID, input.Title, input.Slug, input.Content, input.SourceURL,
+	`, input.ArtistID, input.Title, input.Slug, input.Content, input.SourceURL, publishedAt, importedAt,
 	).Scan(
 		&p.ID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
 		&p.PublishedAt, &p.ImportedAt, &p.MediaCount, &p.AttachmentCount,
@@ -157,9 +172,11 @@ func (r *PostRepo) Create(ctx context.Context, input CreatePostInput) (*models.P
 }
 
 type UpdatePostInput struct {
-	Title   *string `json:"title"`
-	Content *string `json:"content"`
-	TagIDs  []uuid.UUID `json:"tag_ids"`
+	Title       *string     `json:"title"`
+	Content     *string     `json:"content"`
+	PublishedAt *time.Time  `json:"published_at"`
+	ImportedAt  *time.Time  `json:"imported_at"`
+	TagIDs      []uuid.UUID `json:"tag_ids"`
 }
 
 func (r *PostRepo) Update(ctx context.Context, id uuid.UUID, input UpdatePostInput) (*models.Post, error) {
@@ -174,13 +191,19 @@ func (r *PostRepo) Update(ctx context.Context, id uuid.UUID, input UpdatePostInp
 	if input.Content != nil {
 		post.Content = *input.Content
 	}
+	if input.PublishedAt != nil {
+		post.PublishedAt = *input.PublishedAt
+	}
+	if input.ImportedAt != nil {
+		post.ImportedAt = input.ImportedAt
+	}
 
 	err = r.pool.QueryRow(ctx, `
-		UPDATE posts SET title=$2, content=$3
+		UPDATE posts SET title=$2, content=$3, published_at=$4, imported_at=$5, updated_at=now()
 		WHERE id=$1
 		RETURNING id, artist_id, title, slug, content, source_url, published_at, imported_at,
 		          media_count, attachment_count, comment_count, created_at, updated_at
-	`, id, post.Title, post.Content).Scan(
+	`, id, post.Title, post.Content, post.PublishedAt, post.ImportedAt).Scan(
 		&post.ID, &post.ArtistID, &post.Title, &post.Slug, &post.Content, &post.SourceURL,
 		&post.PublishedAt, &post.ImportedAt, &post.MediaCount, &post.AttachmentCount,
 		&post.CommentCount, &post.CreatedAt, &post.UpdatedAt,
@@ -440,12 +463,13 @@ func (r *PostRepo) loadTags(ctx context.Context, postID uuid.UUID) ([]models.Tag
 	return tags, rows.Err()
 }
 
-// AddMedia adds a file reference as media to a post
+// AddMedia adds a file reference as media to a post (idempotent on duplicate)
 func (r *PostRepo) AddMedia(ctx context.Context, postID, fileID uuid.UUID, sortOrder int, caption string) (*models.PostMedia, error) {
 	var m models.PostMedia
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO post_media (post_id, file_id, sort_order, caption)
 		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (post_id, file_id) DO UPDATE SET file_id = EXCLUDED.file_id
 		RETURNING id, post_id, file_id, sort_order, caption, created_at
 	`, postID, fileID, sortOrder, caption).Scan(
 		&m.ID, &m.PostID, &m.FileID, &m.SortOrder, &m.Caption, &m.CreatedAt,
@@ -461,7 +485,7 @@ func (r *PostRepo) RemoveMedia(ctx context.Context, mediaID uuid.UUID) error {
 	return err
 }
 
-// AddAttachment adds a file reference as attachment to a post
+// AddAttachment adds a file reference as attachment to a post (idempotent on duplicate)
 func (r *PostRepo) AddAttachment(ctx context.Context, postID, fileID uuid.UUID, displayName string) (*models.PostAttachment, error) {
 	var dn *string
 	if displayName != "" {
@@ -471,6 +495,7 @@ func (r *PostRepo) AddAttachment(ctx context.Context, postID, fileID uuid.UUID, 
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO post_attachments (post_id, file_id, display_name)
 		VALUES ($1, $2, $3)
+		ON CONFLICT (post_id, file_id) DO UPDATE SET file_id = EXCLUDED.file_id
 		RETURNING id, post_id, file_id, display_name, created_at
 	`, postID, fileID, dn).Scan(
 		&a.ID, &a.PostID, &a.FileID, &a.DisplayName, &a.CreatedAt,
