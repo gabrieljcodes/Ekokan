@@ -150,6 +150,13 @@ func (r *PostRepo) Create(ctx context.Context, input CreatePostInput) (*models.P
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO posts (artist_id, title, slug, content, source_url, published_at, imported_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (artist_id, slug) DO UPDATE
+		SET title = EXCLUDED.title,
+		    content = EXCLUDED.content,
+		    source_url = EXCLUDED.source_url,
+		    published_at = EXCLUDED.published_at,
+		    imported_at = EXCLUDED.imported_at,
+		    updated_at = now()
 		RETURNING id, artist_id, title, slug, content, source_url, published_at, imported_at,
 		          media_count, attachment_count, comment_count, created_at, updated_at
 	`, input.ArtistID, input.Title, input.Slug, input.Content, input.SourceURL, publishedAt, importedAt,
