@@ -91,6 +91,14 @@ export default function ArtistPage() {
             >
               {favorited ? '⭐ Favorited Creator' : '☆ Favorite Creator'}
             </button>
+            <Link
+              to={`/artist/${artist.slug}/edit`}
+              className="btn-secondary"
+              style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}
+              title="Edit Artist Details & Profile Pictures"
+            >
+              ✏️ Edit Artist
+            </Link>
           </div>
           {artist.bio && <p className="artist-profile__bio">{artist.bio}</p>}
         </div>

@@ -329,23 +329,98 @@ func (r *PostRepo) scanPosts(ctx context.Context, rows pgx.Rows, loadThumb bool)
 		); err != nil {
 			return nil, fmt.Errorf("scanning post: %w", err)
 		}
-
-		if loadThumb && p.MediaCount > 0 {
-			// Load only first media as thumbnail
-			media, _ := r.loadFirstMedia(ctx, p.ID)
-			if media != nil {
-				p.Media = []models.PostMedia{*media}
-			}
-		}
-
-		p.Tags, _ = r.loadTags(ctx, p.ID)
-
 		posts = append(posts, p)
 	}
-	if posts == nil {
-		posts = []models.Post{}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
-	return posts, rows.Err()
+	if len(posts) == 0 {
+		return []models.Post{}, nil
+	}
+
+	postIDs := make([]uuid.UUID, len(posts))
+	for i, p := range posts {
+		postIDs[i] = p.ID
+	}
+
+	if loadThumb {
+		mediaMap, _ := r.loadFirstMediaBatch(ctx, postIDs)
+		for i := range posts {
+			if m, ok := mediaMap[posts[i].ID]; ok && posts[i].MediaCount > 0 {
+				posts[i].Media = []models.PostMedia{m}
+			}
+		}
+	}
+
+	tagsMap, _ := r.loadTagsBatch(ctx, postIDs)
+	for i := range posts {
+		if tags, ok := tagsMap[posts[i].ID]; ok {
+			posts[i].Tags = tags
+		} else {
+			posts[i].Tags = []models.Tag{}
+		}
+	}
+
+	return posts, nil
+}
+
+func (r *PostRepo) loadFirstMediaBatch(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID]models.PostMedia, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT ON (pm.post_id)
+		       pm.id, pm.post_id, pm.file_id, pm.sort_order, pm.caption, pm.created_at,
+		       f.id, f.sha256, f.file_path, f.original_name, f.mime_type, f.file_size,
+		       f.width, f.height, f.duration_ms
+		FROM post_media pm
+		JOIN files f ON f.id = pm.file_id
+		WHERE pm.post_id = ANY($1)
+		ORDER BY pm.post_id, pm.sort_order ASC
+	`, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[uuid.UUID]models.PostMedia)
+	for rows.Next() {
+		var m models.PostMedia
+		var f models.File
+		if err := rows.Scan(
+			&m.ID, &m.PostID, &m.FileID, &m.SortOrder, &m.Caption, &m.CreatedAt,
+			&f.ID, &f.SHA256, &f.FilePath, &f.OriginalName, &f.MimeType, &f.FileSize,
+			&f.Width, &f.Height, &f.DurationMs,
+		); err != nil {
+			return nil, err
+		}
+		f.URL = r.store.PublicURL(f.FilePath)
+		m.File = &f
+		res[m.PostID] = m
+	}
+	return res, rows.Err()
+}
+
+func (r *PostRepo) loadTagsBatch(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID][]models.Tag, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT pt.post_id, t.id, t.name, t.slug, t.category, t.post_count
+		FROM tags t
+		JOIN post_tags pt ON pt.tag_id = t.id
+		WHERE pt.post_id = ANY($1)
+		ORDER BY t.name ASC
+	`, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[uuid.UUID][]models.Tag)
+	for rows.Next() {
+		var postID uuid.UUID
+		var tag models.Tag
+		if err := rows.Scan(&postID, &tag.ID, &tag.Name, &tag.Slug, &tag.Category, &tag.PostCount); err != nil {
+			return nil, err
+		}
+		res[postID] = append(res[postID], tag)
+	}
+	return res, rows.Err()
 }
 
 func (r *PostRepo) loadMedia(ctx context.Context, postID uuid.UUID) ([]models.PostMedia, error) {
