@@ -86,7 +86,11 @@ func (r *FileRepo) FindOrCreate(ctx context.Context, f *models.File) (existing b
 
 func (r *FileRepo) DeleteOrphaned(ctx context.Context) (int, error) {
 	rows, err := r.pool.Query(ctx, `
-		DELETE FROM files WHERE ref_count <= 0 RETURNING file_path
+		DELETE FROM files f
+		WHERE f.ref_count <= 0
+		  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_file_id = f.id)
+		  AND NOT EXISTS (SELECT 1 FROM artists a WHERE a.avatar_file_id = f.id OR a.banner_file_id = f.id)
+		RETURNING f.file_path
 	`)
 	if err != nil {
 		return 0, fmt.Errorf("deleting orphaned files: %w", err)
