@@ -70,3 +70,9 @@ func extractBearerToken(r *http.Request) string {
 	}
 	return ""
 }
+
+func IsAdmin(r *http.Request) bool {
+	claims := GetClaims(r)
+	return claims != nil && (strings.EqualFold(claims.Role, "admin") || strings.EqualFold(claims.Role, "administrator"))
+}
+

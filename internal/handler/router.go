@@ -24,6 +24,7 @@ type Deps struct {
 	Comments       *repository.CommentRepo
 	Users          *repository.UserRepo
 	Favorites      *repository.FavoriteRepo
+	Settings       *repository.SettingsRepo
 	JWTSecret      string
 	AllowPublicReg bool
 	StaticDir      string
@@ -47,16 +48,23 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	}))
 
 	// Handlers
-	artistH := NewArtistHandler(deps.Artists, deps.Files, deps.Store)
-	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Store)
+	artistH := NewArtistHandler(deps.Artists, deps.Files, deps.Settings, deps.Store)
+	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Settings, deps.Store)
 	tagH := NewTagHandler(deps.Tags, deps.Posts)
 	commentH := NewCommentHandler(deps.Comments)
 	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.JWTSecret, deps.AllowPublicReg)
 	favH := NewFavoriteHandler(deps.Favorites)
+	settingsH := NewSettingsHandler(deps.Settings, deps.Users)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		r.Use(auth.OptionalAuth(deps.JWTSecret))
+
+		// Settings & Admin
+		r.Get("/settings", settingsH.GetSettings)
+		r.Put("/admin/settings", settingsH.UpdateSettings)
+		r.Get("/admin/users", settingsH.ListUsers)
+		r.Put("/admin/users/{username}/role", settingsH.SetUserRole)
 
 		// Auth
 		r.Route("/auth", func(r chi.Router) {
@@ -89,6 +97,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			r.Put("/{id}", postH.Update)
 			r.Delete("/{id}", postH.Delete)
 			r.Post("/{id}/favorite", favH.TogglePostFavorite)
+			r.Post("/{id}/like", favH.TogglePostLike)
 
 			// Media
 			r.Post("/{id}/media", postH.UploadMedia)

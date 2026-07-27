@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
 
 	"ekokan/internal/config"
 	"ekokan/internal/database"
@@ -63,6 +66,23 @@ func main() {
 	commentRepo := repository.NewCommentRepo(pool)
 	userRepo := repository.NewUserRepo(pool)
 	favoriteRepo := repository.NewFavoriteRepo(pool, store)
+	settingsRepo := repository.NewSettingsRepo(pool)
+
+	// CLI Console Commands
+	if len(os.Args) >= 3 && (strings.EqualFold(os.Args[1], "make-admin") || strings.EqualFold(os.Args[1], "promote") || strings.EqualFold(os.Args[1], "admin") || strings.EqualFold(os.Args[1], "-make-admin")) {
+		username := os.Args[2]
+		u, err := userRepo.GetByUsername(ctx, username)
+		if err != nil || u == nil {
+			fmt.Printf("❌ Error: User '%s' does not exist in Ekokan database.\n", username)
+			os.Exit(1)
+		}
+		if err := userRepo.SetRole(ctx, username, "admin"); err != nil {
+			fmt.Printf("❌ Error promoting user: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Success: User '%s' has been promoted to admin!\n", username)
+		os.Exit(0)
+	}
 
 	// Router
 	router := handler.NewRouter(handler.Deps{
@@ -74,6 +94,7 @@ func main() {
 		Comments:       commentRepo,
 		Users:          userRepo,
 		Favorites:      favoriteRepo,
+		Settings:       settingsRepo,
 		JWTSecret:      cfg.JWTSecret,
 		AllowPublicReg: cfg.AllowPublicReg,
 		StaticDir:      cfg.StaticDir,

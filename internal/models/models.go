@@ -58,6 +58,7 @@ type Artist struct {
 
 type Post struct {
 	ID              uuid.UUID  `json:"id"`
+	UserID          *uuid.UUID `json:"user_id,omitempty"`
 	ArtistID        uuid.UUID  `json:"artist_id"`
 	Title           string     `json:"title"`
 	Slug            string     `json:"slug"`
@@ -68,6 +69,7 @@ type Post struct {
 	MediaCount      int        `json:"media_count"`
 	AttachmentCount int        `json:"attachment_count"`
 	CommentCount    int        `json:"comment_count"`
+	LikeCount       int        `json:"like_count"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 
@@ -78,6 +80,7 @@ type Post struct {
 	Tags          []Tag            `json:"tags,omitempty"`
 	FavoriteCount int              `json:"favorite_count,omitempty"`
 	IsFavorited   bool             `json:"is_favorited,omitempty"`
+	IsLiked       bool             `json:"is_liked,omitempty"`
 }
 
 type PostMedia struct {
@@ -180,4 +183,9 @@ type PaginatedResult[T any] struct {
 	Page       int `json:"page"`
 	PerPage    int `json:"per_page"`
 	TotalPages int `json:"total_pages"`
+}
+
+type AppSettings struct {
+	AllowUserArtistCreation bool `json:"allow_user_artist_creation"`
+	AllowUserPostCreation   bool `json:"allow_user_post_creation"`
 }

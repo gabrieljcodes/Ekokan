@@ -100,6 +100,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		"user":                 user,
 		"favorited_post_ids":   []string{},
 		"favorited_artist_ids": []string{},
+		"liked_post_ids":       []string{},
 	})
 }
 
@@ -134,12 +135,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	favPosts, _ := h.favs.ListUserFavPostIDs(r.Context(), user.ID)
 	favArtists, _ := h.favs.ListUserFavArtistIDs(r.Context(), user.ID)
+	likedPosts, _ := h.favs.ListUserLikedPostIDs(r.Context(), user.ID)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token":                token,
 		"user":                 user,
 		"favorited_post_ids":   favPosts,
 		"favorited_artist_ids": favArtists,
+		"liked_post_ids":       likedPosts,
 	})
 }
 
@@ -158,10 +161,12 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	favPosts, _ := h.favs.ListUserFavPostIDs(r.Context(), user.ID)
 	favArtists, _ := h.favs.ListUserFavArtistIDs(r.Context(), user.ID)
+	likedPosts, _ := h.favs.ListUserLikedPostIDs(r.Context(), user.ID)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":                 user,
 		"favorited_post_ids":   favPosts,
 		"favorited_artist_ids": favArtists,
+		"liked_post_ids":       likedPosts,
 	})
 }

@@ -16,8 +16,9 @@ function formatDate(dateStr: string): string {
 export default function PostPage() {
   const { slug, postId } = useParams<{ slug: string; postId: string }>();
   const [post, setPost] = useState<Post | null>(null);
-  const { user, isFavoritePost, toggleFavoritePost } = useAuth();
+  const { user, isFavoritePost, toggleFavoritePost, isLikedPost, toggleLikePost } = useAuth();
   const favorited = post ? (isFavoritePost(post.id) || post.is_favorited) : false;
+  const liked = post ? (isLikedPost(post.id) || post.is_liked) : false;
   const [adjacent, setAdjacent] = useState<AdjacentPosts>({});
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,13 +117,26 @@ export default function PostPage() {
             <h1 className="post-header__title" style={{ margin: 0, marginRight: '8px' }}>{post.title}</h1>
             <button
               onClick={async () => {
+                if (!user) { alert('Please login to like posts'); return; }
+                try {
+                  const isNowLiked = await toggleLikePost(post.id);
+                  setPost(prev => prev ? { ...prev, like_count: isNowLiked ? (prev.like_count || 0) + 1 : Math.max(0, (prev.like_count || 1) - 1) } : null);
+                } catch (e) { console.error(e); }
+              }}
+              className={`btn-secondary ${liked ? 'fav-btn--active' : ''}`}
+              style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)' }}
+            >
+              {liked ? '❤️' : '🤍'} {post.like_count || 0}
+            </button>
+            <button
+              onClick={async () => {
                 if (!user) { alert('Please login to bookmark posts'); return; }
                 try { await toggleFavoritePost(post.id); } catch (e) { console.error(e); }
               }}
               className={`btn-secondary ${favorited ? 'fav-btn--active' : ''}`}
               style={{ padding: '6px 14px', borderRadius: '20px', fontSize: 'var(--fs-sm)' }}
             >
-              {favorited ? '❤️ Bookmarked' : '🤍 Bookmark Post'}
+              {favorited ? '⭐ Bookmarked' : '☆ Bookmark'}
             </button>
             <Link
               to={`/artist/${slug}/post/${post.id}/edit`}

@@ -73,6 +73,7 @@ export interface Tag {
 
 export interface Post {
   id: string;
+  user_id?: string;
   artist_id: string;
   title: string;
   slug: string;
@@ -83,6 +84,7 @@ export interface Post {
   media_count: number;
   attachment_count: number;
   comment_count: number;
+  like_count: number;
   created_at: string;
   updated_at: string;
   artist?: Artist;
@@ -91,6 +93,7 @@ export interface Post {
   tags?: Tag[];
   favorite_count?: number;
   is_favorited?: boolean;
+  is_liked?: boolean;
 }
 
 export interface Comment {
@@ -120,3 +123,9 @@ export interface AdjacentPosts {
   previous?: Post;
   next?: Post;
 }
+
+export interface AppSettings {
+  allow_user_artist_creation: boolean;
+  allow_user_post_creation: boolean;
+}
+

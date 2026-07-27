@@ -34,7 +34,7 @@ func (r *PostRepo) ListByArtist(ctx context.Context, artistID uuid.UUID, params 
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.created_at, p.updated_at
+		       p.comment_count, p.like_count, p.created_at, p.updated_at
 		FROM posts p
 		WHERE p.artist_id = $1
 		ORDER BY p.published_at DESC
@@ -67,13 +67,13 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Post, err
 	err := r.pool.QueryRow(ctx, `
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.created_at, p.updated_at
+		       p.comment_count, p.like_count, p.created_at, p.updated_at
 		FROM posts p
 		WHERE p.id = $1
 	`, id).Scan(
 		&p.ID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
 		&p.PublishedAt, &p.ImportedAt, &p.MediaCount, &p.AttachmentCount,
-		&p.CommentCount, &p.CreatedAt, &p.UpdatedAt,
+		&p.CommentCount, &p.LikeCount, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -128,6 +128,7 @@ func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID uuid.UUID) (prev
 }
 
 type CreatePostInput struct {
+	UserID      *uuid.UUID  `json:"user_id"`
 	ArtistID    uuid.UUID   `json:"artist_id"`
 	Title       string      `json:"title"`
 	Slug        string      `json:"slug"`
@@ -154,22 +155,23 @@ func (r *PostRepo) Create(ctx context.Context, input CreatePostInput) (*models.P
 
 	var p models.Post
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO posts (artist_id, title, slug, content, source_url, published_at, imported_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO posts (artist_id, title, slug, content, source_url, published_at, imported_at, user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (artist_id, slug) DO UPDATE
 		SET title = EXCLUDED.title,
 		    content = EXCLUDED.content,
 		    source_url = EXCLUDED.source_url,
 		    published_at = EXCLUDED.published_at,
 		    imported_at = EXCLUDED.imported_at,
+		    user_id = COALESCE(EXCLUDED.user_id, posts.user_id),
 		    updated_at = now()
-		RETURNING id, artist_id, title, slug, content, source_url, published_at, imported_at,
-		          media_count, attachment_count, comment_count, created_at, updated_at
-	`, input.ArtistID, input.Title, input.Slug, input.Content, input.SourceURL, publishedAt, importedAt,
+		RETURNING id, user_id, artist_id, title, slug, content, source_url, published_at, imported_at,
+		          media_count, attachment_count, comment_count, like_count, created_at, updated_at
+	`, input.ArtistID, input.Title, input.Slug, input.Content, input.SourceURL, publishedAt, importedAt, input.UserID,
 	).Scan(
-		&p.ID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
+		&p.ID, &p.UserID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
 		&p.PublishedAt, &p.ImportedAt, &p.MediaCount, &p.AttachmentCount,
-		&p.CommentCount, &p.CreatedAt, &p.UpdatedAt,
+		&p.CommentCount, &p.LikeCount, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating post: %w", err)
@@ -215,11 +217,11 @@ func (r *PostRepo) Update(ctx context.Context, id uuid.UUID, input UpdatePostInp
 		UPDATE posts SET title=$2, content=$3, published_at=$4, imported_at=$5, updated_at=now()
 		WHERE id=$1
 		RETURNING id, artist_id, title, slug, content, source_url, published_at, imported_at,
-		          media_count, attachment_count, comment_count, created_at, updated_at
+		          media_count, attachment_count, comment_count, like_count, created_at, updated_at
 	`, id, post.Title, post.Content, post.PublishedAt, post.ImportedAt).Scan(
 		&post.ID, &post.ArtistID, &post.Title, &post.Slug, &post.Content, &post.SourceURL,
 		&post.PublishedAt, &post.ImportedAt, &post.MediaCount, &post.AttachmentCount,
-		&post.CommentCount, &post.CreatedAt, &post.UpdatedAt,
+		&post.CommentCount, &post.LikeCount, &post.CreatedAt, &post.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("updating post: %w", err)
@@ -256,7 +258,7 @@ func (r *PostRepo) ListByTag(ctx context.Context, tagID uuid.UUID, params models
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.created_at, p.updated_at
+		       p.comment_count, p.like_count, p.created_at, p.updated_at
 		FROM posts p
 		JOIN post_tags pt ON pt.post_id = p.id
 		WHERE pt.tag_id = $1
@@ -295,7 +297,7 @@ func (r *PostRepo) Recent(ctx context.Context, params models.PaginationParams) (
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.created_at, p.updated_at
+		       p.comment_count, p.like_count, p.created_at, p.updated_at
 		FROM posts p
 		ORDER BY p.published_at DESC
 		LIMIT $1 OFFSET $2
@@ -331,7 +333,7 @@ func (r *PostRepo) scanPosts(ctx context.Context, rows pgx.Rows, loadThumb bool)
 		if err := rows.Scan(
 			&p.ID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
 			&p.PublishedAt, &p.ImportedAt, &p.MediaCount, &p.AttachmentCount,
-			&p.CommentCount, &p.CreatedAt, &p.UpdatedAt,
+			&p.CommentCount, &p.LikeCount, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning post: %w", err)
 		}

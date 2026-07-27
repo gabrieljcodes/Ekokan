@@ -58,11 +58,46 @@ func (r *FavoriteRepo) ListUserFavPostIDs(ctx context.Context, userID uuid.UUID)
 	return ids, nil
 }
 
+func (r *FavoriteRepo) TogglePostLike(ctx context.Context, userID, postID uuid.UUID) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2`, userID, postID)
+	if err != nil {
+		return false, fmt.Errorf("toggling post like delete: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		return false, nil // Was removed
+	}
+	_, err = r.pool.Exec(ctx, `INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, postID)
+	if err != nil {
+		return false, fmt.Errorf("toggling post like insert: %w", err)
+	}
+	return true, nil // Now liked
+}
+
+func (r *FavoriteRepo) ListUserLikedPostIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `SELECT post_id FROM post_likes WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("listing user liked post ids: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if ids == nil {
+		ids = []uuid.UUID{}
+	}
+	return ids, nil
+}
+
 func (r *FavoriteRepo) ListUserFavPosts(ctx context.Context, userID uuid.UUID) ([]models.Post, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.created_at, p.updated_at,
+		       p.comment_count, p.like_count, p.created_at, p.updated_at,
 		       a.id, a.name, a.slug
 		FROM favorites f
 		JOIN posts p ON f.post_id = p.id
@@ -82,7 +117,7 @@ func (r *FavoriteRepo) ListUserFavPosts(ctx context.Context, userID uuid.UUID) (
 		if err := rows.Scan(
 			&p.ID, &p.ArtistID, &p.Title, &p.Slug, &p.Content, &p.SourceURL,
 			&p.PublishedAt, &p.ImportedAt, &p.MediaCount, &p.AttachmentCount,
-			&p.CommentCount, &p.CreatedAt, &p.UpdatedAt,
+			&p.CommentCount, &p.LikeCount, &p.CreatedAt, &p.UpdatedAt,
 			&art.ID, &art.Name, &art.Slug,
 		); err != nil {
 			return nil, fmt.Errorf("scanning fav post: %w", err)

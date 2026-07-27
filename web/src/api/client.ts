@@ -46,7 +46,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   return res.json();
 }
 
-import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User } from '../types/models';
+import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings } from '../types/models';
 
 export const api = {
   // Artists
@@ -126,22 +126,38 @@ export const api = {
 
   // Auth
   register: (data: { username: string; email?: string; password: string; display_name?: string }) =>
-    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
 
   login: (data: { username: string; password: string }) =>
-    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
 
   getMe: () =>
-    request<{ user: User; favorited_post_ids: string[]; favorited_artist_ids: string[] }>('/api/auth/me'),
+    request<{ user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/me'),
 
-  // Favorites
+  // Favorites & Likes
   togglePostFavorite: (postId: string) =>
     request<{ is_favorited: boolean }>(`/api/posts/${postId}/favorite`, { method: 'POST' }),
+
+  togglePostLike: (postId: string) =>
+    request<{ is_liked: boolean }>(`/api/posts/${postId}/like`, { method: 'POST' }),
 
   toggleArtistFavorite: (artistId: string) =>
     request<{ is_favorited: boolean }>(`/api/artists/${artistId}/favorite`, { method: 'POST' }),
 
   listMyFavorites: () =>
     request<{ artists: Artist[]; posts: Post[] }>('/api/users/me/favorites'),
+
+  // Admin Settings & User Management
+  getSettings: () =>
+    request<AppSettings>('/api/settings'),
+
+  updateSettings: (data: AppSettings) =>
+    request<AppSettings>('/api/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  listUsers: () =>
+    request<{ data: User[] }>('/api/admin/users'),
+
+  setUserRole: (username: string, role: string) =>
+    request<{ message: string }>(`/api/admin/users/${encodeURIComponent(username)}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
 };
 

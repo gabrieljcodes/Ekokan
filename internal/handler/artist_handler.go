@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"ekokan/internal/auth"
 	"ekokan/internal/models"
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
@@ -12,13 +13,14 @@ import (
 )
 
 type ArtistHandler struct {
-	repo  *repository.ArtistRepo
-	files *repository.FileRepo
-	store *storage.OpenDALStore
+	repo     *repository.ArtistRepo
+	files    *repository.FileRepo
+	settings *repository.SettingsRepo
+	store    *storage.OpenDALStore
 }
 
-func NewArtistHandler(repo *repository.ArtistRepo, files *repository.FileRepo, store *storage.OpenDALStore) *ArtistHandler {
-	return &ArtistHandler{repo: repo, files: files, store: store}
+func NewArtistHandler(repo *repository.ArtistRepo, files *repository.FileRepo, settings *repository.SettingsRepo, store *storage.OpenDALStore) *ArtistHandler {
+	return &ArtistHandler{repo: repo, files: files, settings: settings, store: store}
 }
 
 func (h *ArtistHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +51,13 @@ func (h *ArtistHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArtistHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if s, err := h.settings.GetSettings(r.Context()); err == nil && !s.AllowUserArtistCreation {
+		if !auth.IsAdmin(r) {
+			writeError(w, http.StatusForbidden, "artist profile creation is currently restricted to administrators")
+			return
+		}
+	}
+
 	var input repository.CreateArtistInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
@@ -61,6 +70,10 @@ func (h *ArtistHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if input.Slug == "" {
 		writeError(w, http.StatusBadRequest, "slug is required")
 		return
+	}
+
+	if userID, ok := auth.GetUserID(r); ok {
+		input.UserID = &userID
 	}
 
 	artist, err := h.repo.Create(r.Context(), input)

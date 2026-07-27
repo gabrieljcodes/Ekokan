@@ -120,7 +120,7 @@ func (r *ArtistRepo) GetBySlug(ctx context.Context, slug string) (*models.Artist
 	var linksJSON []byte
 	var avatarPath, bannerPath *string
 
-	err := r.pool.QueryRow(ctx, `
+	query := `
 		SELECT a.id, a.user_id, a.name, a.slug, a.bio, a.avatar_file_id, a.banner_file_id,
 		       a.links, a.post_count, a.created_at, a.updated_at,
 		       af.file_path, bf.file_path
@@ -128,7 +128,22 @@ func (r *ArtistRepo) GetBySlug(ctx context.Context, slug string) (*models.Artist
 		LEFT JOIN files af ON a.avatar_file_id = af.id
 		LEFT JOIN files bf ON a.banner_file_id = bf.id
 		WHERE a.slug = $1
-	`, slug).Scan(
+	`
+	args := []any{slug}
+	if parsedID, err := uuid.Parse(slug); err == nil {
+		query = `
+			SELECT a.id, a.user_id, a.name, a.slug, a.bio, a.avatar_file_id, a.banner_file_id,
+			       a.links, a.post_count, a.created_at, a.updated_at,
+			       af.file_path, bf.file_path
+			FROM artists a
+			LEFT JOIN files af ON a.avatar_file_id = af.id
+			LEFT JOIN files bf ON a.banner_file_id = bf.id
+			WHERE a.slug = $1 OR a.id = $2
+		`
+		args = []any{slug, parsedID}
+	}
+
+	err := r.pool.QueryRow(ctx, query, args...).Scan(
 		&a.ID, &a.UserID, &a.Name, &a.Slug, &a.Bio, &a.AvatarFileID, &a.BannerFileID,
 		&linksJSON, &a.PostCount, &a.CreatedAt, &a.UpdatedAt,
 		&avatarPath, &bannerPath,
@@ -194,6 +209,7 @@ func (r *ArtistRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Artist,
 }
 
 type CreateArtistInput struct {
+	UserID       *uuid.UUID        `json:"user_id"`
 	Name         string            `json:"name"`
 	Slug         string            `json:"slug"`
 	Bio          string            `json:"bio"`
@@ -209,12 +225,23 @@ func (r *ArtistRepo) Create(ctx context.Context, input CreateArtistInput) (*mode
 	}
 	linksJSON, _ := json.Marshal(links)
 
+	// Automatically deduplicate slug if it already exists in database
+	baseSlug := input.Slug
+	for i := 2; i < 1000; i++ {
+		var exists bool
+		_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM artists WHERE slug = $1)`, input.Slug).Scan(&exists)
+		if !exists {
+			break
+		}
+		input.Slug = fmt.Sprintf("%s-%d", baseSlug, i)
+	}
+
 	var a models.Artist
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO artists (name, slug, bio, avatar_file_id, banner_file_id, links)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO artists (name, slug, bio, avatar_file_id, banner_file_id, links, user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
-	`, input.Name, input.Slug, input.Bio, input.AvatarFileID, input.BannerFileID, linksJSON,
+	`, input.Name, input.Slug, input.Bio, input.AvatarFileID, input.BannerFileID, linksJSON, input.UserID,
 	).Scan(
 		&a.ID, &a.UserID, &a.Name, &a.Slug, &a.Bio, &a.AvatarFileID, &a.BannerFileID,
 		&linksJSON, &a.PostCount, &a.CreatedAt, &a.UpdatedAt,
@@ -228,6 +255,7 @@ func (r *ArtistRepo) Create(ctx context.Context, input CreateArtistInput) (*mode
 
 type UpdateArtistInput struct {
 	Name         *string            `json:"name"`
+	Slug         *string            `json:"slug"`
 	Bio          *string            `json:"bio"`
 	Links        map[string]string  `json:"links"`
 	AvatarFileID *uuid.UUID         `json:"avatar_file_id"`
@@ -246,6 +274,20 @@ func (r *ArtistRepo) Update(ctx context.Context, id uuid.UUID, input UpdateArtis
 	if input.Name != nil {
 		artist.Name = *input.Name
 	}
+	if input.Slug != nil && *input.Slug != "" && *input.Slug != artist.Slug {
+		// Deduplicate if needed when renaming slug
+		baseSlug := *input.Slug
+		newSlug := baseSlug
+		for i := 2; i < 1000; i++ {
+			var exists bool
+			_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM artists WHERE slug = $1 AND id <> $2)`, newSlug, id).Scan(&exists)
+			if !exists {
+				break
+			}
+			newSlug = fmt.Sprintf("%s-%d", baseSlug, i)
+		}
+		artist.Slug = newSlug
+	}
 	if input.Bio != nil {
 		artist.Bio = *input.Bio
 	}
@@ -263,10 +305,10 @@ func (r *ArtistRepo) Update(ctx context.Context, id uuid.UUID, input UpdateArtis
 
 	var linksOut []byte
 	err = r.pool.QueryRow(ctx, `
-		UPDATE artists SET name=$2, bio=$3, links=$4, avatar_file_id=$5, banner_file_id=$6
+		UPDATE artists SET name=$2, slug=$3, bio=$4, links=$5, avatar_file_id=$6, banner_file_id=$7
 		WHERE id=$1
 		RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
-	`, id, artist.Name, artist.Bio, linksJSON, artist.AvatarFileID, artist.BannerFileID,
+	`, id, artist.Name, artist.Slug, artist.Bio, linksJSON, artist.AvatarFileID, artist.BannerFileID,
 	).Scan(
 		&artist.ID, &artist.UserID, &artist.Name, &artist.Slug, &artist.Bio,
 		&artist.AvatarFileID, &artist.BannerFileID,

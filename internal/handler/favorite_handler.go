@@ -34,6 +34,25 @@ func (h *FavoriteHandler) TogglePostFavorite(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]bool{"is_favorited": favorited})
 }
 
+func (h *FavoriteHandler) TogglePostLike(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "login required to like posts")
+		return
+	}
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok {
+		return
+	}
+
+	liked, err := h.favs.TogglePostLike(r.Context(), userID, postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"is_liked": liked})
+}
+
 func (h *FavoriteHandler) ToggleArtistFavorite(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserID(r)
 	if !ok {

@@ -11,6 +11,7 @@ import ManageTagsPage from './pages/ManageTagsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import FavoritesPage from './pages/FavoritesPage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="/artists/new" element={<CreateArtistPage />} />
             <Route path="/posts/new" element={<CreatePostPage />} />
             <Route path="/posts/:postId/edit" element={<EditPostPage />} />

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"ekokan/internal/auth"
 	"ekokan/internal/models"
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
@@ -13,14 +14,15 @@ import (
 )
 
 type PostHandler struct {
-	posts   *repository.PostRepo
-	files   *repository.FileRepo
-	artists *repository.ArtistRepo
-	store   *storage.OpenDALStore
+	posts    *repository.PostRepo
+	files    *repository.FileRepo
+	artists  *repository.ArtistRepo
+	settings *repository.SettingsRepo
+	store    *storage.OpenDALStore
 }
 
-func NewPostHandler(posts *repository.PostRepo, files *repository.FileRepo, artists *repository.ArtistRepo, store *storage.OpenDALStore) *PostHandler {
-	return &PostHandler{posts: posts, files: files, artists: artists, store: store}
+func NewPostHandler(posts *repository.PostRepo, files *repository.FileRepo, artists *repository.ArtistRepo, settings *repository.SettingsRepo, store *storage.OpenDALStore) *PostHandler {
+	return &PostHandler{posts: posts, files: files, artists: artists, settings: settings, store: store}
 }
 
 func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +86,13 @@ func (h *PostHandler) GetAdjacent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if s, err := h.settings.GetSettings(r.Context()); err == nil && !s.AllowUserPostCreation {
+		if !auth.IsAdmin(r) {
+			writeError(w, http.StatusForbidden, "post creation is currently restricted to administrators")
+			return
+		}
+	}
+
 	var input repository.CreatePostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
@@ -100,6 +109,10 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if input.Slug == "" {
 		writeError(w, http.StatusBadRequest, "slug is required")
 		return
+	}
+
+	if userID, ok := auth.GetUserID(r); ok {
+		input.UserID = &userID
 	}
 
 	post, err := h.posts.Create(r.Context(), input)

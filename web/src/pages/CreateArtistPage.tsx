@@ -5,9 +5,8 @@ import { api } from '../api/client';
 export default function CreateArtistPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
+  const [slug, setSlug] = useState(() => Math.floor(10000000 + Math.random() * 90000000).toString());
   const [bio, setBio] = useState('');
-  const [customSlug, setCustomSlug] = useState(false);
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -22,15 +21,6 @@ export default function CreateArtistPage() {
 
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!customSlug) {
-      const generated = val
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setSlug(generated);
-    }
   };
 
   const avatarPreview = useMemo(() => {
@@ -140,21 +130,18 @@ export default function CreateArtistPage() {
 
           <div className="form-group">
             <label className="form-label">
-              URL Slug <span style={{ color: 'var(--danger)' }}>*</span>
-              <span className="form-label__hint">Unique URL identifier</span>
+              Artist URL ID <span style={{ color: 'var(--danger)' }}>*</span>
+              <span className="form-label__hint">Numeric or Creator ID (e.g., 37736420)</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. mika-pikazo"
+              placeholder="e.g. 37736420"
               value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value);
-                setCustomSlug(true);
-              }}
+              onChange={(e) => setSlug(e.target.value)}
               required
               disabled={loading}
             />
-            <span className="form-helper">Accessed via /artist/<strong>{slug || 'slug'}</strong></span>
+            <span className="form-helper">Accessed via /artist/<strong>{slug || '37736420'}</strong></span>
           </div>
 
           <div className="form-group">
