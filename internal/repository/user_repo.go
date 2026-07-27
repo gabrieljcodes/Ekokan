@@ -98,6 +98,7 @@ func (r *UserRepo) ListUsers(ctx context.Context) ([]models.User, error) {
 		SELECT id, username, email, display_name, avatar_file_id, role, is_active, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
+		LIMIT 500
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("listing users: %w", err)
@@ -111,6 +112,9 @@ func (r *UserRepo) ListUsers(ctx context.Context) ([]models.User, error) {
 			return nil, fmt.Errorf("scanning user: %w", err)
 		}
 		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating users: %w", err)
 	}
 	if users == nil {
 		users = []models.User{}

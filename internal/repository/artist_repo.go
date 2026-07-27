@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"ekokan/internal/models"
@@ -10,8 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
 
 type ArtistRepo struct {
 	pool  *pgxpool.Pool
@@ -97,6 +104,9 @@ func (r *ArtistRepo) List(ctx context.Context, params models.PaginationParams, s
 			a.BannerURL = r.store.PublicURL(*bannerPath)
 		}
 		artists = append(artists, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating artists: %w", err)
 	}
 
 	if artists == nil {
@@ -225,32 +235,34 @@ func (r *ArtistRepo) Create(ctx context.Context, input CreateArtistInput) (*mode
 	}
 	linksJSON, _ := json.Marshal(links)
 
-	// Automatically deduplicate slug if it already exists in database
 	baseSlug := input.Slug
-	for i := 2; i < 1000; i++ {
-		var exists bool
-		_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM artists WHERE slug = $1)`, input.Slug).Scan(&exists)
-		if !exists {
-			break
-		}
-		input.Slug = fmt.Sprintf("%s-%d", baseSlug, i)
-	}
-
+	currentSlug := baseSlug
 	var a models.Artist
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO artists (name, slug, bio, avatar_file_id, banner_file_id, links, user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
-	`, input.Name, input.Slug, input.Bio, input.AvatarFileID, input.BannerFileID, linksJSON, input.UserID,
-	).Scan(
-		&a.ID, &a.UserID, &a.Name, &a.Slug, &a.Bio, &a.AvatarFileID, &a.BannerFileID,
-		&linksJSON, &a.PostCount, &a.CreatedAt, &a.UpdatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating artist: %w", err)
+	var err error
+
+	for i := 1; i <= 20; i++ {
+		err = r.pool.QueryRow(ctx, `
+			INSERT INTO artists (name, slug, bio, avatar_file_id, banner_file_id, links, user_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
+		`, input.Name, currentSlug, input.Bio, input.AvatarFileID, input.BannerFileID, linksJSON, input.UserID,
+		).Scan(
+			&a.ID, &a.UserID, &a.Name, &a.Slug, &a.Bio, &a.AvatarFileID, &a.BannerFileID,
+			&linksJSON, &a.PostCount, &a.CreatedAt, &a.UpdatedAt,
+		)
+		if err == nil {
+			_ = json.Unmarshal(linksJSON, &a.Links)
+			if a.Links == nil {
+				a.Links = make(map[string]string)
+			}
+			return &a, nil
+		}
+		if !isUniqueViolation(err) {
+			return nil, fmt.Errorf("creating artist: %w", err)
+		}
+		currentSlug = fmt.Sprintf("%s-%d", baseSlug, i+1)
 	}
-	_ = json.Unmarshal(linksJSON, &a.Links)
-	return &a, nil
+	return nil, fmt.Errorf("creating artist failed after repeated slug collisions: %w", err)
 }
 
 type UpdateArtistInput struct {
@@ -274,19 +286,9 @@ func (r *ArtistRepo) Update(ctx context.Context, id uuid.UUID, input UpdateArtis
 	if input.Name != nil {
 		artist.Name = *input.Name
 	}
-	if input.Slug != nil && *input.Slug != "" && *input.Slug != artist.Slug {
-		// Deduplicate if needed when renaming slug
-		baseSlug := *input.Slug
-		newSlug := baseSlug
-		for i := 2; i < 1000; i++ {
-			var exists bool
-			_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM artists WHERE slug = $1 AND id <> $2)`, newSlug, id).Scan(&exists)
-			if !exists {
-				break
-			}
-			newSlug = fmt.Sprintf("%s-%d", baseSlug, i)
-		}
-		artist.Slug = newSlug
+	baseSlug := artist.Slug
+	if input.Slug != nil && *input.Slug != "" {
+		baseSlug = *input.Slug
 	}
 	if input.Bio != nil {
 		artist.Bio = *input.Bio
@@ -302,23 +304,34 @@ func (r *ArtistRepo) Update(ctx context.Context, id uuid.UUID, input UpdateArtis
 	}
 
 	linksJSON, _ := json.Marshal(artist.Links)
-
+	currentSlug := baseSlug
 	var linksOut []byte
-	err = r.pool.QueryRow(ctx, `
-		UPDATE artists SET name=$2, slug=$3, bio=$4, links=$5, avatar_file_id=$6, banner_file_id=$7
-		WHERE id=$1
-		RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
-	`, id, artist.Name, artist.Slug, artist.Bio, linksJSON, artist.AvatarFileID, artist.BannerFileID,
-	).Scan(
-		&artist.ID, &artist.UserID, &artist.Name, &artist.Slug, &artist.Bio,
-		&artist.AvatarFileID, &artist.BannerFileID,
-		&linksOut, &artist.PostCount, &artist.CreatedAt, &artist.UpdatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("updating artist: %w", err)
+
+	for i := 1; i <= 20; i++ {
+		artist.Slug = currentSlug
+		err = r.pool.QueryRow(ctx, `
+			UPDATE artists SET name=$2, slug=$3, bio=$4, links=$5, avatar_file_id=$6, banner_file_id=$7
+			WHERE id=$1
+			RETURNING id, user_id, name, slug, bio, avatar_file_id, banner_file_id, links, post_count, created_at, updated_at
+		`, id, artist.Name, artist.Slug, artist.Bio, linksJSON, artist.AvatarFileID, artist.BannerFileID,
+		).Scan(
+			&artist.ID, &artist.UserID, &artist.Name, &artist.Slug, &artist.Bio,
+			&artist.AvatarFileID, &artist.BannerFileID,
+			&linksOut, &artist.PostCount, &artist.CreatedAt, &artist.UpdatedAt,
+		)
+		if err == nil {
+			_ = json.Unmarshal(linksOut, &artist.Links)
+			if artist.Links == nil {
+				artist.Links = make(map[string]string)
+			}
+			return artist, nil
+		}
+		if !isUniqueViolation(err) {
+			return nil, fmt.Errorf("updating artist: %w", err)
+		}
+		currentSlug = fmt.Sprintf("%s-%d", baseSlug, i+1)
 	}
-	_ = json.Unmarshal(linksOut, &artist.Links)
-	return artist, nil
+	return nil, fmt.Errorf("updating artist failed after repeated slug collisions: %w", err)
 }
 
 func (r *ArtistRepo) Delete(ctx context.Context, id uuid.UUID) error {

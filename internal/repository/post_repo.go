@@ -83,9 +83,16 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Post, err
 	}
 
 	// Load related data
-	p.Media, _ = r.loadMedia(ctx, p.ID)
-	p.Attachments, _ = r.loadAttachments(ctx, p.ID)
-	p.Tags, _ = r.loadTags(ctx, p.ID)
+	var errMedia, errAtt, errTags error
+	if p.Media, errMedia = r.loadMedia(ctx, p.ID); errMedia != nil {
+		return nil, fmt.Errorf("loading post media: %w", errMedia)
+	}
+	if p.Attachments, errAtt = r.loadAttachments(ctx, p.ID); errAtt != nil {
+		return nil, fmt.Errorf("loading post attachments: %w", errAtt)
+	}
+	if p.Tags, errTags = r.loadTags(ctx, p.ID); errTags != nil {
+		return nil, fmt.Errorf("loading post tags: %w", errTags)
+	}
 
 	return &p, nil
 }
@@ -177,12 +184,18 @@ func (r *PostRepo) Create(ctx context.Context, input CreatePostInput) (*models.P
 		return nil, fmt.Errorf("creating post: %w", err)
 	}
 
-	// Add tags
-	for _, tagID := range input.TagIDs {
-		_, _ = r.pool.Exec(ctx, `INSERT INTO post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, p.ID, tagID)
+	// Add tags cleanly in a single statement
+	if len(input.TagIDs) > 0 {
+		_, err = r.pool.Exec(ctx, `INSERT INTO post_tags (post_id, tag_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, p.ID, input.TagIDs)
+		if err != nil {
+			return nil, fmt.Errorf("associating tags with post: %w", err)
+		}
 	}
 
-	p.Tags, _ = r.loadTags(ctx, p.ID)
+	var errTags error
+	if p.Tags, errTags = r.loadTags(ctx, p.ID); errTags != nil {
+		return nil, fmt.Errorf("loading post tags after creation: %w", errTags)
+	}
 	return &p, nil
 }
 
@@ -227,17 +240,37 @@ func (r *PostRepo) Update(ctx context.Context, id uuid.UUID, input UpdatePostInp
 		return nil, fmt.Errorf("updating post: %w", err)
 	}
 
-	// Rebuild tags if provided
+	// Rebuild tags atomically if provided
 	if input.TagIDs != nil {
-		_, _ = r.pool.Exec(ctx, `DELETE FROM post_tags WHERE post_id = $1`, id)
-		for _, tagID := range input.TagIDs {
-			_, _ = r.pool.Exec(ctx, `INSERT INTO post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, id, tagID)
+		tx, err := r.pool.Begin(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("beginning tx for post update: %w", err)
+		}
+		defer tx.Rollback(ctx)
+
+		if _, err := tx.Exec(ctx, `DELETE FROM post_tags WHERE post_id = $1`, id); err != nil {
+			return nil, fmt.Errorf("deleting old tags: %w", err)
+		}
+		if len(input.TagIDs) > 0 {
+			if _, err := tx.Exec(ctx, `INSERT INTO post_tags (post_id, tag_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, id, input.TagIDs); err != nil {
+				return nil, fmt.Errorf("inserting new tags: %w", err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("committing tag updates: %w", err)
 		}
 	}
 
-	post.Tags, _ = r.loadTags(ctx, id)
-	post.Media, _ = r.loadMedia(ctx, id)
-	post.Attachments, _ = r.loadAttachments(ctx, id)
+	var errTags, errMedia, errAtt error
+	if post.Tags, errTags = r.loadTags(ctx, id); errTags != nil {
+		return nil, fmt.Errorf("loading post tags: %w", errTags)
+	}
+	if post.Media, errMedia = r.loadMedia(ctx, id); errMedia != nil {
+		return nil, fmt.Errorf("loading post media: %w", errMedia)
+	}
+	if post.Attachments, errAtt = r.loadAttachments(ctx, id); errAtt != nil {
+		return nil, fmt.Errorf("loading post attachments: %w", errAtt)
+	}
 
 	return post, nil
 }
@@ -352,7 +385,10 @@ func (r *PostRepo) scanPosts(ctx context.Context, rows pgx.Rows, loadThumb bool)
 	}
 
 	if loadThumb {
-		mediaMap, _ := r.loadFirstMediaBatch(ctx, postIDs)
+		mediaMap, err := r.loadFirstMediaBatch(ctx, postIDs)
+		if err != nil {
+			return nil, fmt.Errorf("loading media batch: %w", err)
+		}
 		for i := range posts {
 			if m, ok := mediaMap[posts[i].ID]; ok && posts[i].MediaCount > 0 {
 				posts[i].Media = []models.PostMedia{m}
@@ -360,7 +396,10 @@ func (r *PostRepo) scanPosts(ctx context.Context, rows pgx.Rows, loadThumb bool)
 		}
 	}
 
-	tagsMap, _ := r.loadTagsBatch(ctx, postIDs)
+	tagsMap, err := r.loadTagsBatch(ctx, postIDs)
+	if err != nil {
+		return nil, fmt.Errorf("loading tags batch: %w", err)
+	}
 	for i := range posts {
 		if tags, ok := tagsMap[posts[i].ID]; ok {
 			posts[i].Tags = tags
@@ -601,15 +640,21 @@ func (r *PostRepo) RemoveAttachment(ctx context.Context, attachmentID uuid.UUID)
 	return err
 }
 
-// ReorderMedia updates sort_order for all media in a post
+// ReorderMedia updates sort_order for all media in a post atomically
 func (r *PostRepo) ReorderMedia(ctx context.Context, postID uuid.UUID, mediaIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning tx for reordering media: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	for i, id := range mediaIDs {
-		_, err := r.pool.Exec(ctx, `UPDATE post_media SET sort_order = $1 WHERE id = $2 AND post_id = $3`, i, id, postID)
+		_, err := tx.Exec(ctx, `UPDATE post_media SET sort_order = $1 WHERE id = $2 AND post_id = $3`, i, id, postID)
 		if err != nil {
-			return fmt.Errorf("reordering media: %w", err)
+			return fmt.Errorf("reordering media at index %d: %w", i, err)
 		}
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 // Helper to load artist data for a post
@@ -619,14 +664,14 @@ func (r *PostRepo) LoadArtistForPost(ctx context.Context, artistID uuid.UUID) (*
 	var avatarPath, bannerPath *string
 
 	err := r.pool.QueryRow(ctx, `
-		SELECT a.id, a.name, a.slug, a.avatar_file_id,
+		SELECT a.id, a.name, a.slug, a.avatar_file_id, a.links,
 		       af.file_path, bf.file_path
 		FROM artists a
 		LEFT JOIN files af ON a.avatar_file_id = af.id
 		LEFT JOIN files bf ON a.banner_file_id = bf.id
 		WHERE a.id = $1
 	`, artistID).Scan(
-		&a.ID, &a.Name, &a.Slug, &a.AvatarFileID,
+		&a.ID, &a.Name, &a.Slug, &a.AvatarFileID, &linksJSON,
 		&avatarPath, &bannerPath,
 	)
 	if err != nil {

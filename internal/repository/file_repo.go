@@ -71,17 +71,35 @@ func (r *FileRepo) Create(ctx context.Context, f *models.File) error {
 	).Scan(&f.ID, &f.CreatedAt)
 }
 
-// FindOrCreate looks up by SHA256 hash. If found, returns existing record. If not, creates new.
+// FindOrCreate looks up by SHA256 hash. If found, returns existing record. If not, creates new atomically.
 func (r *FileRepo) FindOrCreate(ctx context.Context, f *models.File) (existing bool, err error) {
+	err = r.pool.QueryRow(ctx, `
+		INSERT INTO files (sha256, file_path, original_name, mime_type, file_size, width, height, duration_ms, blurhash, storage_backend)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (sha256) DO NOTHING
+		RETURNING id, ref_count, created_at
+	`, f.SHA256, f.FilePath, f.OriginalName, f.MimeType, f.FileSize,
+		f.Width, f.Height, f.DurationMs, f.BlurHash, f.StorageBackend,
+	).Scan(&f.ID, &f.RefCount, &f.CreatedAt)
+
+	if err == nil {
+		f.URL = r.store.PublicURL(f.FilePath)
+		return false, nil
+	}
+	if err != pgx.ErrNoRows {
+		return false, fmt.Errorf("creating file atomically: %w", err)
+	}
+
+	// Conflict occurred; fetch existing file
 	found, err := r.FindBySHA256(ctx, f.SHA256)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("finding existing file after conflict: %w", err)
 	}
-	if found != nil {
-		*f = *found
-		return true, nil
+	if found == nil {
+		return false, fmt.Errorf("file sha256 conflict occurred but row not found")
 	}
-	return false, r.Create(ctx, f)
+	*f = *found
+	return true, nil
 }
 
 func (r *FileRepo) DeleteOrphaned(ctx context.Context) (int, error) {

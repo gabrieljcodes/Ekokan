@@ -24,18 +24,21 @@ func NewFavoriteRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *FavoriteR
 // Post Favorites
 
 func (r *FavoriteRepo) TogglePostFavorite(ctx context.Context, userID, postID uuid.UUID) (bool, error) {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM favorites WHERE user_id = $1 AND post_id = $2`, userID, postID)
+	var isFavorited bool
+	err := r.pool.QueryRow(ctx, `
+		WITH deleted AS (
+			DELETE FROM favorites WHERE user_id=$1 AND post_id=$2 RETURNING 1
+		), inserted AS (
+			INSERT INTO favorites (user_id, post_id)
+			SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM deleted)
+			ON CONFLICT DO NOTHING RETURNING 1
+		)
+		SELECT EXISTS(SELECT 1 FROM inserted)
+	`, userID, postID).Scan(&isFavorited)
 	if err != nil {
-		return false, fmt.Errorf("toggling post favorite delete: %w", err)
+		return false, fmt.Errorf("toggling post favorite: %w", err)
 	}
-	if tag.RowsAffected() > 0 {
-		return false, nil // Was removed
-	}
-	_, err = r.pool.Exec(ctx, `INSERT INTO favorites (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, postID)
-	if err != nil {
-		return false, fmt.Errorf("toggling post favorite insert: %w", err)
-	}
-	return true, nil // Now favorited
+	return isFavorited, nil
 }
 
 func (r *FavoriteRepo) ListUserFavPostIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
@@ -48,9 +51,13 @@ func (r *FavoriteRepo) ListUserFavPostIDs(ctx context.Context, userID uuid.UUID)
 	var ids []uuid.UUID
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err == nil {
-			ids = append(ids, id)
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning fav post id: %w", err)
 		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating fav post ids: %w", err)
 	}
 	if ids == nil {
 		ids = []uuid.UUID{}
@@ -59,18 +66,21 @@ func (r *FavoriteRepo) ListUserFavPostIDs(ctx context.Context, userID uuid.UUID)
 }
 
 func (r *FavoriteRepo) TogglePostLike(ctx context.Context, userID, postID uuid.UUID) (bool, error) {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2`, userID, postID)
+	var isLiked bool
+	err := r.pool.QueryRow(ctx, `
+		WITH deleted AS (
+			DELETE FROM post_likes WHERE user_id=$1 AND post_id=$2 RETURNING 1
+		), inserted AS (
+			INSERT INTO post_likes (user_id, post_id)
+			SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM deleted)
+			ON CONFLICT DO NOTHING RETURNING 1
+		)
+		SELECT EXISTS(SELECT 1 FROM inserted)
+	`, userID, postID).Scan(&isLiked)
 	if err != nil {
-		return false, fmt.Errorf("toggling post like delete: %w", err)
+		return false, fmt.Errorf("toggling post like: %w", err)
 	}
-	if tag.RowsAffected() > 0 {
-		return false, nil // Was removed
-	}
-	_, err = r.pool.Exec(ctx, `INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, postID)
-	if err != nil {
-		return false, fmt.Errorf("toggling post like insert: %w", err)
-	}
-	return true, nil // Now liked
+	return isLiked, nil
 }
 
 func (r *FavoriteRepo) ListUserLikedPostIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
@@ -83,9 +93,13 @@ func (r *FavoriteRepo) ListUserLikedPostIDs(ctx context.Context, userID uuid.UUI
 	var ids []uuid.UUID
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err == nil {
-			ids = append(ids, id)
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning liked post id: %w", err)
 		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating liked post ids: %w", err)
 	}
 	if ids == nil {
 		ids = []uuid.UUID{}
@@ -126,6 +140,9 @@ func (r *FavoriteRepo) ListUserFavPosts(ctx context.Context, userID uuid.UUID) (
 		p.Artist = &art
 		posts = append(posts, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating fav posts: %w", err)
+	}
 	if posts == nil {
 		posts = []models.Post{}
 	}
@@ -135,18 +152,21 @@ func (r *FavoriteRepo) ListUserFavPosts(ctx context.Context, userID uuid.UUID) (
 // Artist Favorites
 
 func (r *FavoriteRepo) ToggleArtistFavorite(ctx context.Context, userID, artistID uuid.UUID) (bool, error) {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM artist_favorites WHERE user_id = $1 AND artist_id = $2`, userID, artistID)
+	var isFavorited bool
+	err := r.pool.QueryRow(ctx, `
+		WITH deleted AS (
+			DELETE FROM artist_favorites WHERE user_id=$1 AND artist_id=$2 RETURNING 1
+		), inserted AS (
+			INSERT INTO artist_favorites (user_id, artist_id)
+			SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM deleted)
+			ON CONFLICT DO NOTHING RETURNING 1
+		)
+		SELECT EXISTS(SELECT 1 FROM inserted)
+	`, userID, artistID).Scan(&isFavorited)
 	if err != nil {
-		return false, fmt.Errorf("toggling artist favorite delete: %w", err)
+		return false, fmt.Errorf("toggling artist favorite: %w", err)
 	}
-	if tag.RowsAffected() > 0 {
-		return false, nil
-	}
-	_, err = r.pool.Exec(ctx, `INSERT INTO artist_favorites (user_id, artist_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, artistID)
-	if err != nil {
-		return false, fmt.Errorf("toggling artist favorite insert: %w", err)
-	}
-	return true, nil
+	return isFavorited, nil
 }
 
 func (r *FavoriteRepo) ListUserFavArtistIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
@@ -159,9 +179,13 @@ func (r *FavoriteRepo) ListUserFavArtistIDs(ctx context.Context, userID uuid.UUI
 	var ids []uuid.UUID
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err == nil {
-			ids = append(ids, id)
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning fav artist id: %w", err)
 		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating fav artist ids: %w", err)
 	}
 	if ids == nil {
 		ids = []uuid.UUID{}
@@ -204,9 +228,14 @@ func (r *FavoriteRepo) ListUserFavArtists(ctx context.Context, userID uuid.UUID)
 		if bannerPath != nil {
 			a.BannerURL = r.store.PublicURL(*bannerPath)
 		}
-		_ = json.Unmarshal(linksJSON, &a.Links)
+		if err := json.Unmarshal(linksJSON, &a.Links); err != nil || a.Links == nil {
+			a.Links = map[string]string{}
+		}
 		a.IsFavorited = true
 		artists = append(artists, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating fav artists: %w", err)
 	}
 	if artists == nil {
 		artists = []models.Artist{}

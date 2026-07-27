@@ -25,10 +25,10 @@ func (r *TagRepo) List(ctx context.Context, category string) ([]models.Tag, erro
 	var args []any
 
 	if category != "" {
-		query = `SELECT id, name, slug, category, post_count, created_at FROM tags WHERE category = $1 ORDER BY name ASC`
+		query = `SELECT id, name, slug, category, post_count, created_at FROM tags WHERE category = $1 ORDER BY name ASC LIMIT 1000`
 		args = []any{category}
 	} else {
-		query = `SELECT id, name, slug, category, post_count, created_at FROM tags ORDER BY post_count DESC, name ASC`
+		query = `SELECT id, name, slug, category, post_count, created_at FROM tags ORDER BY post_count DESC, name ASC LIMIT 1000`
 	}
 
 	rows, err := r.pool.Query(ctx, query, args...)
@@ -72,27 +72,24 @@ func (r *TagRepo) FindOrCreate(ctx context.Context, name, category string) (*mod
 		category = "general"
 	}
 
-	// Try to find first
-	tag, err := r.GetBySlug(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-	if tag != nil {
-		return tag, nil
-	}
-
-	// Create
 	var t models.Tag
-	err = r.pool.QueryRow(ctx, `
+	err := r.pool.QueryRow(ctx, `
 		INSERT INTO tags (name, slug, category)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+		ON CONFLICT (slug) DO UPDATE
+		SET name = EXCLUDED.name, category = EXCLUDED.category
+		WHERE tags.name IS DISTINCT FROM EXCLUDED.name OR tags.category IS DISTINCT FROM EXCLUDED.category
 		RETURNING id, name, slug, category, post_count, created_at
 	`, name, slug, category).Scan(&t.ID, &t.Name, &t.Slug, &t.Category, &t.PostCount, &t.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("creating tag: %w", err)
+	if err == nil {
+		return &t, nil
 	}
-	return &t, nil
+	if err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("upserting tag: %w", err)
+	}
+
+	// Tag already existed without changes; fetch it
+	return r.GetBySlug(ctx, slug)
 }
 
 func (r *TagRepo) Delete(ctx context.Context, id uuid.UUID) error {

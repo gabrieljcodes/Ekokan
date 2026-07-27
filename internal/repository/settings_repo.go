@@ -33,7 +33,7 @@ func (r *SettingsRepo) GetSettings(ctx context.Context) (*models.AppSettings, er
 	for rows.Next() {
 		var key, val string
 		if err := rows.Scan(&key, &val); err != nil {
-			continue
+			return nil, fmt.Errorf("scanning setting: %w", err)
 		}
 		if key == "allow_user_artist_creation" {
 			settings.AllowUserArtistCreation, _ = strconv.ParseBool(val)
@@ -41,22 +41,20 @@ func (r *SettingsRepo) GetSettings(ctx context.Context) (*models.AppSettings, er
 			settings.AllowUserPostCreation, _ = strconv.ParseBool(val)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating settings: %w", err)
+	}
 	return settings, nil
 }
 
 func (r *SettingsRepo) UpdateSettings(ctx context.Context, s models.AppSettings) (*models.AppSettings, error) {
-	queries := map[string]string{
-		"allow_user_artist_creation": strconv.FormatBool(s.AllowUserArtistCreation),
-		"allow_user_post_creation":   strconv.FormatBool(s.AllowUserPostCreation),
-	}
-	for k, v := range queries {
-		_, err := r.pool.Exec(ctx, `
-			INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-			ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()
-		`, k, v)
-		if err != nil {
-			return nil, fmt.Errorf("updating setting %s: %w", k, err)
-		}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO app_settings (key, value, updated_at)
+		VALUES ('allow_user_artist_creation', $1, NOW()), ('allow_user_post_creation', $2, NOW())
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+	`, strconv.FormatBool(s.AllowUserArtistCreation), strconv.FormatBool(s.AllowUserPostCreation))
+	if err != nil {
+		return nil, fmt.Errorf("updating app settings: %w", err)
 	}
 	return r.GetSettings(ctx)
 }
