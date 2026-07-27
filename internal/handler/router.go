@@ -59,49 +59,46 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
-		// 1. Public & Optional Auth endpoints
+		// Global settings & OpenAPI JSON (Public / Optional Auth)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.OptionalAuth(deps.JWTSecret))
-
-			// Global settings & OpenAPI JSON
 			r.Get("/settings", settingsH.GetSettings)
 			r.Get("/docs/openapi.json", docs.ServeOpenAPI)
+		})
 
-			// Auth
-			r.Route("/auth", func(r chi.Router) {
+		// Auth
+		r.Route("/auth", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(auth.OptionalAuth(deps.JWTSecret))
 				r.Post("/register", authH.Register)
 				r.Post("/login", authH.Login)
 			})
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Get("/me", authH.GetMe)
+			})
+		})
 
-			// Public Catalog Read-Only APIs
-			r.Route("/artists", func(r chi.Router) {
+		// User personal endpoints
+		r.Route("/users", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Get("/me/favorites", favH.ListMyFavorites)
+			})
+		})
+
+		// Artists
+		r.Route("/artists", func(r chi.Router) {
+			// Public catalog read-only
+			r.Group(func(r chi.Router) {
+				r.Use(auth.OptionalAuth(deps.JWTSecret))
 				r.Get("/", artistH.List)
 				r.Get("/{slug}", artistH.GetBySlug)
 				r.Get("/{slug}/posts", postH.ListByArtist)
 			})
-
-			r.Route("/posts", func(r chi.Router) {
-				r.Get("/recent", postH.Recent)
-				r.Get("/{id}", postH.GetByID)
-				r.Get("/{id}/adjacent", postH.GetAdjacent)
-				r.Get("/{id}/comments", commentH.ListByPost)
-			})
-
-			r.Route("/tags", func(r chi.Router) {
-				r.Get("/", tagH.List)
-				r.Get("/{slug}/posts", tagH.GetPosts)
-			})
-		})
-
-		// 2. Protected User API endpoints (Require User Token Authentication)
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAuth(deps.JWTSecret))
-
-			r.Get("/auth/me", authH.GetMe)
-			r.Get("/users/me/favorites", favH.ListMyFavorites)
-
-			// Artists creation and profile updates
-			r.Route("/artists", func(r chi.Router) {
+			// Protected creation and modifications
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(deps.JWTSecret))
 				r.Post("/", artistH.Create)
 				r.Put("/{id}", artistH.Update)
 				r.Delete("/{id}", artistH.Delete)
@@ -109,9 +106,21 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Post("/{id}/banner", artistH.UploadBanner)
 				r.Post("/{id}/favorite", favH.ToggleArtistFavorite)
 			})
+		})
 
-			// Posts creation, modification, and user interaction
-			r.Route("/posts", func(r chi.Router) {
+		// Posts
+		r.Route("/posts", func(r chi.Router) {
+			// Public catalog read-only
+			r.Group(func(r chi.Router) {
+				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Get("/recent", postH.Recent)
+				r.Get("/{id}", postH.GetByID)
+				r.Get("/{id}/adjacent", postH.GetAdjacent)
+				r.Get("/{id}/comments", commentH.ListByPost)
+			})
+			// Protected creation and interaction
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(deps.JWTSecret))
 				r.Post("/", postH.Create)
 				r.Put("/{id}", postH.Update)
 				r.Delete("/{id}", postH.Delete)
@@ -131,21 +140,30 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Post("/{id}/comments", commentH.Create)
 				r.Delete("/{id}/comments/{commentId}", commentH.Delete)
 			})
+		})
 
-			// Tags
-			r.Route("/tags", func(r chi.Router) {
+		// Tags
+		r.Route("/tags", func(r chi.Router) {
+			// Public read-only
+			r.Group(func(r chi.Router) {
+				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Get("/", tagH.List)
+				r.Get("/{slug}/posts", tagH.GetPosts)
+			})
+			// Protected creation and deletion
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAuth(deps.JWTSecret))
 				r.Post("/", tagH.Create)
 				r.Delete("/{id}", tagH.Delete)
 			})
 		})
 
-		// 3. Protected Admin API endpoints (Require Admin Token Authentication)
-		r.Group(func(r chi.Router) {
+		// Admin endpoints
+		r.Route("/admin", func(r chi.Router) {
 			r.Use(auth.RequireAdmin(deps.JWTSecret))
-
-			r.Put("/admin/settings", settingsH.UpdateSettings)
-			r.Get("/admin/users", settingsH.ListUsers)
-			r.Put("/admin/users/{username}/role", settingsH.SetUserRole)
+			r.Put("/settings", settingsH.UpdateSettings)
+			r.Get("/users", settingsH.ListUsers)
+			r.Put("/users/{username}/role", settingsH.SetUserRole)
 		})
 	})
 
