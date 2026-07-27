@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ekokan/internal/auth"
+	"ekokan/internal/docs"
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
 
@@ -58,70 +59,98 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
-		r.Use(auth.OptionalAuth(deps.JWTSecret))
+		// 1. Public & Optional Auth endpoints
+		r.Group(func(r chi.Router) {
+			r.Use(auth.OptionalAuth(deps.JWTSecret))
 
-		// Settings & Admin
-		r.Get("/settings", settingsH.GetSettings)
-		r.Put("/admin/settings", settingsH.UpdateSettings)
-		r.Get("/admin/users", settingsH.ListUsers)
-		r.Put("/admin/users/{username}/role", settingsH.SetUserRole)
+			// Global settings & OpenAPI JSON
+			r.Get("/settings", settingsH.GetSettings)
+			r.Get("/docs/openapi.json", docs.ServeOpenAPI)
 
-		// Auth
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authH.Register)
-			r.Post("/login", authH.Login)
-			r.Get("/me", authH.GetMe)
+			// Auth
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/register", authH.Register)
+				r.Post("/login", authH.Login)
+			})
+
+			// Public Catalog Read-Only APIs
+			r.Route("/artists", func(r chi.Router) {
+				r.Get("/", artistH.List)
+				r.Get("/{slug}", artistH.GetBySlug)
+				r.Get("/{slug}/posts", postH.ListByArtist)
+			})
+
+			r.Route("/posts", func(r chi.Router) {
+				r.Get("/recent", postH.Recent)
+				r.Get("/{id}", postH.GetByID)
+				r.Get("/{id}/adjacent", postH.GetAdjacent)
+				r.Get("/{id}/comments", commentH.ListByPost)
+			})
+
+			r.Route("/tags", func(r chi.Router) {
+				r.Get("/", tagH.List)
+				r.Get("/{slug}/posts", tagH.GetPosts)
+			})
 		})
 
-		// User personal gallery
-		r.Get("/users/me/favorites", favH.ListMyFavorites)
-		// Artists
-		r.Route("/artists", func(r chi.Router) {
-			r.Get("/", artistH.List)
-			r.Post("/", artistH.Create)
-			r.Get("/{slug}", artistH.GetBySlug)
-			r.Put("/{id}", artistH.Update)
-			r.Delete("/{id}", artistH.Delete)
-			r.Post("/{id}/avatar", artistH.UploadAvatar)
-			r.Post("/{id}/banner", artistH.UploadBanner)
-			r.Get("/{slug}/posts", postH.ListByArtist)
-			r.Post("/{id}/favorite", favH.ToggleArtistFavorite)
+		// 2. Protected User API endpoints (Require User Token Authentication)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth(deps.JWTSecret))
+
+			r.Get("/auth/me", authH.GetMe)
+			r.Get("/users/me/favorites", favH.ListMyFavorites)
+
+			// Artists creation and profile updates
+			r.Route("/artists", func(r chi.Router) {
+				r.Post("/", artistH.Create)
+				r.Put("/{id}", artistH.Update)
+				r.Delete("/{id}", artistH.Delete)
+				r.Post("/{id}/avatar", artistH.UploadAvatar)
+				r.Post("/{id}/banner", artistH.UploadBanner)
+				r.Post("/{id}/favorite", favH.ToggleArtistFavorite)
+			})
+
+			// Posts creation, modification, and user interaction
+			r.Route("/posts", func(r chi.Router) {
+				r.Post("/", postH.Create)
+				r.Put("/{id}", postH.Update)
+				r.Delete("/{id}", postH.Delete)
+				r.Post("/{id}/favorite", favH.TogglePostFavorite)
+				r.Post("/{id}/like", favH.TogglePostLike)
+
+				// Media
+				r.Post("/{id}/media", postH.UploadMedia)
+				r.Delete("/{id}/media/{mediaId}", postH.RemoveMedia)
+				r.Put("/{id}/media/reorder", postH.ReorderMedia)
+
+				// Attachments
+				r.Post("/{id}/attachments", postH.UploadAttachment)
+				r.Delete("/{id}/attachments/{attId}", postH.RemoveAttachment)
+
+				// Comments
+				r.Post("/{id}/comments", commentH.Create)
+				r.Delete("/{id}/comments/{commentId}", commentH.Delete)
+			})
+
+			// Tags
+			r.Route("/tags", func(r chi.Router) {
+				r.Post("/", tagH.Create)
+				r.Delete("/{id}", tagH.Delete)
+			})
 		})
 
-		// Posts
-		r.Route("/posts", func(r chi.Router) {
-			r.Get("/recent", postH.Recent)
-			r.Get("/{id}", postH.GetByID)
-			r.Get("/{id}/adjacent", postH.GetAdjacent)
-			r.Post("/", postH.Create)
-			r.Put("/{id}", postH.Update)
-			r.Delete("/{id}", postH.Delete)
-			r.Post("/{id}/favorite", favH.TogglePostFavorite)
-			r.Post("/{id}/like", favH.TogglePostLike)
+		// 3. Protected Admin API endpoints (Require Admin Token Authentication)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAdmin(deps.JWTSecret))
 
-			// Media
-			r.Post("/{id}/media", postH.UploadMedia)
-			r.Delete("/{id}/media/{mediaId}", postH.RemoveMedia)
-			r.Put("/{id}/media/reorder", postH.ReorderMedia)
-
-			// Attachments
-			r.Post("/{id}/attachments", postH.UploadAttachment)
-			r.Delete("/{id}/attachments/{attId}", postH.RemoveAttachment)
-
-			// Comments
-			r.Get("/{id}/comments", commentH.ListByPost)
-			r.Post("/{id}/comments", commentH.Create)
-			r.Delete("/{id}/comments/{commentId}", commentH.Delete)
-		})
-
-		// Tags
-		r.Route("/tags", func(r chi.Router) {
-			r.Get("/", tagH.List)
-			r.Post("/", tagH.Create)
-			r.Delete("/{id}", tagH.Delete)
-			r.Get("/{slug}/posts", tagH.GetPosts)
+			r.Put("/admin/settings", settingsH.UpdateSettings)
+			r.Get("/admin/users", settingsH.ListUsers)
+			r.Put("/admin/users/{username}/role", settingsH.SetUserRole)
 		})
 	})
+
+	// Serve interactive Scalar OpenAPI Documentation UI
+	r.Get("/docs", docs.ServeScalar)
 
 	// Serve media files (local storage)
 	r.Get("/media/*", func(w http.ResponseWriter, r *http.Request) {

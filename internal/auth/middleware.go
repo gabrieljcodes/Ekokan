@@ -31,6 +31,30 @@ func RequireAuth(secret string) func(http.Handler) http.Handler {
 	}
 }
 
+func RequireAdmin(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := extractBearerToken(r)
+			if token == "" {
+				http.Error(w, `{"error":"unauthorized: missing token"}`, http.StatusUnauthorized)
+				return
+			}
+			claims, err := ValidateToken(secret, token)
+			if err != nil {
+				http.Error(w, `{"error":"unauthorized: `+err.Error()+`"}`, http.StatusUnauthorized)
+				return
+			}
+			ctx := context.WithValue(r.Context(), claimsKey, claims)
+			r = r.WithContext(ctx)
+			if !IsAdmin(r) {
+				http.Error(w, `{"error":"forbidden: admin token required"}`, http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func OptionalAuth(secret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
