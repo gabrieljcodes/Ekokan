@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ekokan/internal/auth"
 	"ekokan/internal/docs"
@@ -39,6 +40,16 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	// Security Headers Middleware (audit item 3.6)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("X-XSS-Protection", "0")
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   strings.Split(corsOrigins, ","),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -52,7 +63,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	artistH := NewArtistHandler(deps.Artists, deps.Files, deps.Settings, deps.Store)
 	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Settings, deps.Store)
 	tagH := NewTagHandler(deps.Tags, deps.Posts)
-	commentH := NewCommentHandler(deps.Comments)
+	commentH := NewCommentHandler(deps.Comments, deps.Posts, deps.Users)
 	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.JWTSecret, deps.AllowPublicReg)
 	favH := NewFavoriteHandler(deps.Favorites)
 	settingsH := NewSettingsHandler(deps.Settings, deps.Users)
@@ -66,9 +77,11 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			r.Get("/docs/openapi.json", docs.ServeOpenAPI)
 		})
 
-		// Auth
+		// Auth (with rate limiting - audit item 2.1)
+		authLimiter := auth.NewRateLimiter(20, 5*time.Minute)
 		r.Route("/auth", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
+				r.Use(authLimiter.Middleware)
 				r.Use(auth.OptionalAuth(deps.JWTSecret))
 				r.Post("/register", authH.Register)
 				r.Post("/login", authH.Login)
@@ -117,6 +130,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Get("/{id}", postH.GetByID)
 				r.Get("/{id}/adjacent", postH.GetAdjacent)
 				r.Get("/{id}/comments", commentH.ListByPost)
+				r.Post("/{id}/comments", commentH.Create) // Audit item 3.3: support anonymous and optional auth comments
 			})
 			// Protected creation and interaction
 			r.Group(func(r chi.Router) {
@@ -136,8 +150,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Post("/{id}/attachments", postH.UploadAttachment)
 				r.Delete("/{id}/attachments/{attId}", postH.RemoveAttachment)
 
-				// Comments
-				r.Post("/{id}/comments", commentH.Create)
+				// Comments deletion requires authentication (owner/admin)
 				r.Delete("/{id}/comments/{commentId}", commentH.Delete)
 			})
 		})
@@ -150,10 +163,14 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Get("/", tagH.List)
 				r.Get("/{slug}/posts", tagH.GetPosts)
 			})
-			// Protected creation and deletion
+			// Protected creation
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireAuth(deps.JWTSecret))
 				r.Post("/", tagH.Create)
+			})
+			// Admin-only deletion (Audit item 3.1)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireAdmin(deps.JWTSecret))
 				r.Delete("/{id}", tagH.Delete)
 			})
 		})

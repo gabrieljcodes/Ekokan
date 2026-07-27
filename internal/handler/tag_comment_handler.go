@@ -90,10 +90,12 @@ func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 type CommentHandler struct {
 	comments *repository.CommentRepo
+	posts    *repository.PostRepo
+	users    *repository.UserRepo
 }
 
-func NewCommentHandler(comments *repository.CommentRepo) *CommentHandler {
-	return &CommentHandler{comments: comments}
+func NewCommentHandler(comments *repository.CommentRepo, posts *repository.PostRepo, users *repository.UserRepo) *CommentHandler {
+	return &CommentHandler{comments: comments, posts: posts, users: users}
 }
 
 func (h *CommentHandler) ListByPost(w http.ResponseWriter, r *http.Request) {
@@ -121,14 +123,32 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	input.PostID = postID
-	if userID, loggedIn := auth.GetUserID(r); loggedIn {
-		input.UserID = &userID
+	if len(input.Content) > 3000 || len(input.AuthorName) > 50 {
+		writeError(w, http.StatusBadRequest, "content or author name exceeds maximum allowed length")
+		return
 	}
-
 	if input.Content == "" {
 		writeError(w, http.StatusBadRequest, "content is required")
 		return
+	}
+
+	input.PostID = postID
+	if userID, loggedIn := auth.GetUserID(r); loggedIn {
+		input.UserID = &userID
+		if h.users != nil {
+			if u, err := h.users.GetByID(r.Context(), userID); err == nil && u != nil {
+				if u.DisplayName != nil && *u.DisplayName != "" {
+					input.AuthorName = *u.DisplayName
+				} else {
+					input.AuthorName = u.Username
+				}
+			}
+		}
+	} else {
+		input.UserID = nil
+		if input.AuthorName == "" {
+			input.AuthorName = "Anonymous"
+		}
 	}
 
 	comment, err := h.comments.Create(r.Context(), input)
@@ -142,6 +162,27 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseParamID(w, r, "commentId", "invalid comment id")
 	if !ok {
+		return
+	}
+
+	existing, err := h.comments.GetByID(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to verify comment ownership")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "comment not found")
+		return
+	}
+
+	canDelete := canModifyResource(r, existing.UserID)
+	if !canDelete && h.posts != nil {
+		if post, err := h.posts.GetByID(r.Context(), existing.PostID); err == nil && post != nil {
+			canDelete = canModifyResource(r, post.UserID)
+		}
+	}
+	if !canDelete {
+		writeError(w, http.StatusForbidden, "you do not have permission to delete this comment")
 		return
 	}
 

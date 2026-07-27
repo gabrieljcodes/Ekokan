@@ -2,8 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
+
+	"ekokan/internal/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,7 +21,22 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
+	if status >= 500 {
+		slog.Error("internal server error encountered", "status", status, "detail", msg)
+		msg = "internal server error"
+	}
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func canModifyResource(r *http.Request, resourceUserID *uuid.UUID) bool {
+	if auth.IsAdmin(r) {
+		return true
+	}
+	userID, ok := auth.GetUserID(r)
+	if !ok {
+		return false
+	}
+	return resourceUserID != nil && *resourceUserID == userID
 }
 
 func parsePageParams(r *http.Request) (page, perPage int) {

@@ -13,6 +13,8 @@ services:
       - .env
     environment:
       - PORT=${PORT:-8080}
+      - JWT_SECRET=${JWT_SECRET:-ekokan-default-secure-secret-min-thirty-two-chars-long-do-not-use-in-prod}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8070,http://localhost:8080,http://127.0.0.1:8070}
       - STATIC_DIR=./web/dist
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/ekokan?sslmode=disable}
       - STORAGE_BACKEND=${STORAGE_BACKEND:-s3}

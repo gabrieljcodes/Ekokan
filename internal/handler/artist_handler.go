@@ -71,6 +71,10 @@ func (h *ArtistHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "slug is required")
 		return
 	}
+	if len(input.Name) > 100 || len(input.Slug) > 100 || len(input.Bio) > 10000 {
+		writeError(w, http.StatusBadRequest, "input field exceeds maximum allowed length")
+		return
+	}
 
 	if userID, ok := auth.GetUserID(r); ok {
 		input.UserID = &userID
@@ -90,9 +94,27 @@ func (h *ArtistHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existing, err := h.repo.GetBySlug(r.Context(), id.String())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch artist")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "artist not found")
+		return
+	}
+	if !canModifyResource(r, existing.UserID) {
+		writeError(w, http.StatusForbidden, "you do not have permission to modify this profile")
+		return
+	}
+
 	var input repository.UpdateArtistInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if (input.Name != nil && len(*input.Name) > 100) || (input.Bio != nil && len(*input.Bio) > 10000) {
+		writeError(w, http.StatusBadRequest, "field exceeds maximum allowed length")
 		return
 	}
 
@@ -114,6 +136,20 @@ func (h *ArtistHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existing, err := h.repo.GetBySlug(r.Context(), id.String())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch artist")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "artist not found")
+		return
+	}
+	if !canModifyResource(r, existing.UserID) {
+		writeError(w, http.StatusForbidden, "you do not have permission to delete this profile")
+		return
+	}
+
 	if err := h.repo.Delete(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -126,6 +162,22 @@ func (h *ArtistHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+
+	existing, err := h.repo.GetBySlug(r.Context(), id.String())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch artist")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "artist not found")
+		return
+	}
+	if !canModifyResource(r, existing.UserID) {
+		writeError(w, http.StatusForbidden, "you do not have permission to modify this profile")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB limit for avatar
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -171,6 +223,22 @@ func (h *ArtistHandler) UploadBanner(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+
+	existing, err := h.repo.GetBySlug(r.Context(), id.String())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch artist")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "artist not found")
+		return
+	}
+	if !canModifyResource(r, existing.UserID) {
+		writeError(w, http.StatusForbidden, "you do not have permission to modify this profile")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB limit for banner
 
 	file, header, err := r.FormFile("file")
 	if err != nil {

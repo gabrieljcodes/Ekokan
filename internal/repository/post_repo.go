@@ -97,38 +97,52 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Post, err
 	return &p, nil
 }
 
-// GetAdjacentPosts returns the previous and next post for an artist, sorted by published_at.
+// GetAdjacentPosts returns the previous and next post for an artist in a single optimized query.
 func (r *PostRepo) GetAdjacentPosts(ctx context.Context, postID uuid.UUID) (prev *models.Post, next *models.Post, err error) {
-	var artistID uuid.UUID
-	var publishedAt time.Time
-	if err := r.pool.QueryRow(ctx, `SELECT artist_id, published_at FROM posts WHERE id = $1`, postID).Scan(&artistID, &publishedAt); err != nil {
-		return nil, nil, fmt.Errorf("getting post metadata for adjacent check: %w", err)
-	}
+	query := `
+		WITH target AS (
+			SELECT artist_id, published_at FROM posts WHERE id = $1
+		),
+		adjacent AS (
+			(
+				SELECT 'prev' AS pos, p.id, p.title, p.slug, p.published_at
+				FROM posts p, target t
+				WHERE p.artist_id = t.artist_id AND p.published_at < t.published_at
+				ORDER BY p.published_at DESC
+				LIMIT 1
+			)
+			UNION ALL
+			(
+				SELECT 'next' AS pos, p.id, p.title, p.slug, p.published_at
+				FROM posts p, target t
+				WHERE p.artist_id = t.artist_id AND p.published_at > t.published_at
+				ORDER BY p.published_at ASC
+				LIMIT 1
+			)
+		)
+		SELECT pos, id, title, slug, published_at FROM adjacent;
+	`
 
-	// Previous (older)
-	var prevPost models.Post
-	err = r.pool.QueryRow(ctx, `
-		SELECT id, title, slug, published_at
-		FROM posts
-		WHERE artist_id = $1 AND published_at < $2
-		ORDER BY published_at DESC
-		LIMIT 1
-	`, artistID, publishedAt).Scan(&prevPost.ID, &prevPost.Title, &prevPost.Slug, &prevPost.PublishedAt)
-	if err == nil {
-		prev = &prevPost
+	rows, err := r.pool.Query(ctx, query, postID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("querying adjacent posts: %w", err)
 	}
+	defer rows.Close()
 
-	// Next (newer)
-	var nextPost models.Post
-	err = r.pool.QueryRow(ctx, `
-		SELECT id, title, slug, published_at
-		FROM posts
-		WHERE artist_id = $1 AND published_at > $2
-		ORDER BY published_at ASC
-		LIMIT 1
-	`, artistID, publishedAt).Scan(&nextPost.ID, &nextPost.Title, &nextPost.Slug, &nextPost.PublishedAt)
-	if err == nil {
-		next = &nextPost
+	for rows.Next() {
+		var pos string
+		var p models.Post
+		if err := rows.Scan(&pos, &p.ID, &p.Title, &p.Slug, &p.PublishedAt); err != nil {
+			return nil, nil, fmt.Errorf("scanning adjacent post: %w", err)
+		}
+		if pos == "prev" {
+			prev = &p
+		} else if pos == "next" {
+			next = &p
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
 	}
 
 	return prev, next, nil

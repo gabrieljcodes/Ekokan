@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"ekokan/internal/auth"
 	"ekokan/internal/models"
@@ -23,6 +25,23 @@ type PostHandler struct {
 
 func NewPostHandler(posts *repository.PostRepo, files *repository.FileRepo, artists *repository.ArtistRepo, settings *repository.SettingsRepo, store *storage.OpenDALStore) *PostHandler {
 	return &PostHandler{posts: posts, files: files, artists: artists, settings: settings, store: store}
+}
+
+func (h *PostHandler) checkPostOwnership(w http.ResponseWriter, r *http.Request, postID uuid.UUID) bool {
+	post, err := h.posts.GetByID(r.Context(), postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to verify post ownership")
+		return false
+	}
+	if post == nil {
+		writeError(w, http.StatusNotFound, "post not found")
+		return false
+	}
+	if !canModifyResource(r, post.UserID) {
+		writeError(w, http.StatusForbidden, "you do not have permission to modify or delete this post")
+		return false
+	}
+	return true
 }
 
 func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +129,10 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "slug is required")
 		return
 	}
+	if len(input.Title) > 200 || len(input.Content) > 50000 {
+		writeError(w, http.StatusBadRequest, "field exceeds maximum allowed length")
+		return
+	}
 
 	if userID, ok := auth.GetUserID(r); ok {
 		input.UserID = &userID
@@ -125,13 +148,17 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseParamID(w, r, "id")
-	if !ok {
+	if !ok || !h.checkPostOwnership(w, r, id) {
 		return
 	}
 
 	var input repository.UpdatePostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if (input.Title != nil && len(*input.Title) > 200) || (input.Content != nil && len(*input.Content) > 50000) {
+		writeError(w, http.StatusBadRequest, "field exceeds maximum allowed length")
 		return
 	}
 
@@ -149,7 +176,7 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseParamID(w, r, "id")
-	if !ok {
+	if !ok || !h.checkPostOwnership(w, r, id) {
 		return
 	}
 
@@ -158,9 +185,11 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clean up orphaned files
+	// Clean up orphaned files safely without relying on canceled request context
 	go func() {
-		_, _ = h.files.DeleteOrphaned(r.Context())
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		_, _ = h.files.DeleteOrphaned(ctx)
 	}()
 
 	w.WriteHeader(http.StatusNoContent)
@@ -168,7 +197,7 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	postID, ok := parseParamID(w, r, "id", "invalid post id")
-	if !ok {
+	if !ok || !h.checkPostOwnership(w, r, postID) {
 		return
 	}
 
@@ -222,6 +251,10 @@ func (h *PostHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) RemoveMedia(w http.ResponseWriter, r *http.Request) {
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok || !h.checkPostOwnership(w, r, postID) {
+		return
+	}
 	mediaID, ok := parseParamID(w, r, "mediaId", "invalid media id")
 	if !ok {
 		return
@@ -236,7 +269,7 @@ func (h *PostHandler) RemoveMedia(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) ReorderMedia(w http.ResponseWriter, r *http.Request) {
 	postID, ok := parseParamID(w, r, "id", "invalid post id")
-	if !ok {
+	if !ok || !h.checkPostOwnership(w, r, postID) {
 		return
 	}
 
@@ -257,7 +290,7 @@ func (h *PostHandler) ReorderMedia(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	postID, ok := parseParamID(w, r, "id", "invalid post id")
-	if !ok {
+	if !ok || !h.checkPostOwnership(w, r, postID) {
 		return
 	}
 
@@ -309,6 +342,10 @@ func (h *PostHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PostHandler) RemoveAttachment(w http.ResponseWriter, r *http.Request) {
+	postID, ok := parseParamID(w, r, "id", "invalid post id")
+	if !ok || !h.checkPostOwnership(w, r, postID) {
+		return
+	}
 	attID, ok := parseParamID(w, r, "attId", "invalid attachment id")
 	if !ok {
 		return

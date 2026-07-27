@@ -34,11 +34,21 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) < 32 {
+		return nil, fmt.Errorf("JWT_SECRET must be explicitly set and have at least 32 characters (audit requirement 1.4)")
+	}
+
+	corsOrigins := os.Getenv("CORS_ORIGINS")
+	if corsOrigins == "" || corsOrigins == "*" {
+		return nil, fmt.Errorf("CORS_ORIGINS must be explicitly configured without fallback '*' when AllowCredentials=true (audit requirement 2.2)")
+	}
+
 	cfg := &Config{
 		Port:           getEnvInt("PORT", 8080),
 		DatabaseURL:    getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/ekokan?sslmode=disable"),
-		CORSOrigins:    getEnv("CORS_ORIGINS", "*"),
-		JWTSecret:      getEnv("JWT_SECRET", "ekokan-dev-default-secret-key-do-not-use-in-prod"),
+		CORSOrigins:    corsOrigins,
+		JWTSecret:      jwtSecret,
 		AllowPublicReg: getEnvBool("ALLOW_PUBLIC_REGISTRATION", true),
 		StorageBackend: getEnv("STORAGE_BACKEND", "fs"),
 		StorageFSRoot:  getEnv("STORAGE_FS_ROOT", "./data/media"),

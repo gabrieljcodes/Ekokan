@@ -116,6 +116,8 @@ func (s *OpenDALStore) ServeFile(w http.ResponseWriter, r *http.Request, key str
 			http.Error(w, "File not found", http.StatusNotFound)
 			return
 		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(key)))
 		http.ServeContent(w, r, filepath.Base(key), time.Time{}, bytes.NewReader(data))
 	}
 }
@@ -132,6 +134,12 @@ type UploadResult struct {
 
 // ProcessUpload reads the file, hashes it, stores it via OpenDAL, and returns metadata.
 func ProcessUpload(ctx context.Context, store *OpenDALStore, filename string, reader io.Reader) (*UploadResult, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".html", ".htm", ".svg", ".xhtml", ".js", ".exe", ".sh", ".bat", ".com", ".msi", ".vbs", ".scr":
+		return nil, fmt.Errorf("file type %q is not permitted for security reasons (audit item 1.2)", ext)
+	}
+
 	hash, data, err := HashReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("hashing upload: %w", err)
@@ -139,6 +147,10 @@ func ProcessUpload(ctx context.Context, store *OpenDALStore, filename string, re
 
 	storagePath := StoragePath(hash, filename)
 	mimeType := http.DetectContentType(data)
+
+	if strings.HasPrefix(mimeType, "text/html") || strings.HasPrefix(mimeType, "image/svg") || strings.HasPrefix(mimeType, "application/xhtml") {
+		return nil, fmt.Errorf("detected MIME type %q is not permitted for security reasons", mimeType)
+	}
 
 	exists, err := store.Exists(ctx, storagePath)
 	if err != nil {
