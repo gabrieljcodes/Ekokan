@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,7 +105,11 @@ func (s *OpenDALStore) Exists(_ context.Context, key string) (bool, error) {
 }
 
 func (s *OpenDALStore) PublicURL(key string) string {
-	return s.baseURL + "/" + key
+	parts := strings.Split(key, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return s.baseURL + "/" + strings.Join(parts, "/")
 }
 
 func (s *OpenDALStore) ServeFile(w http.ResponseWriter, r *http.Request, key string) {
