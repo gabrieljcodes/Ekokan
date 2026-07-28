@@ -14,9 +14,6 @@ export default function Layout() {
         <nav className="app-header__nav">
           <Link to="/" className="app-header__link">Artists</Link>
           <Link to="/tags" className="app-header__link">Tags</Link>
-          <a href="/docs" target="_blank" rel="noopener noreferrer" className="app-header__link" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            📖 API Docs
-          </a>
           {user && (
             <Link to="/favorites" className="app-header__link" style={{ color: '#ff4081', fontWeight: 600 }}>
               ⭐ Favorites
@@ -67,7 +64,7 @@ export default function Layout() {
       <footer className="app-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 24px' }}>
         <span>Ekokan &mdash; Art Gallery</span>
         <a href="/docs" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
-          Interactive API Documentation (Scalar / OpenAPI 3.0) &nearr;
+          Interactive API Documentation (Scalar / OpenAPI 3.0) ↗
         </a>
       </footer>
     </>

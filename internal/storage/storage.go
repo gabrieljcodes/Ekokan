@@ -107,7 +107,18 @@ func (s *OpenDALStore) Exists(_ context.Context, key string) (bool, error) {
 func (s *OpenDALStore) PublicURL(key string) string {
 	parts := strings.Split(key, "/")
 	for i, part := range parts {
-		parts[i] = url.PathEscape(part)
+		escaped := url.PathEscape(part)
+		replacer := strings.NewReplacer(
+			"+", "%2B",
+			"&", "%26",
+			"$", "%24",
+			"@", "%40",
+			"=", "%3D",
+			";", "%3B",
+			",", "%2C",
+			":", "%3A",
+		)
+		parts[i] = replacer.Replace(escaped)
 	}
 	return s.baseURL + "/" + strings.Join(parts, "/")
 }
