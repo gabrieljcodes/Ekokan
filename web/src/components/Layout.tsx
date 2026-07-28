@@ -15,9 +15,14 @@ export default function Layout() {
           <Link to="/" className="app-header__link">Artists</Link>
           <Link to="/tags" className="app-header__link">Tags</Link>
           {user && (
-            <Link to="/favorites" className="app-header__link" style={{ color: '#ff4081', fontWeight: 600 }}>
-              ⭐ Favorites
-            </Link>
+            <>
+              <Link to="/favorites" className="app-header__link" style={{ color: '#ff4081', fontWeight: 600 }}>
+                ⭐ Favorites
+              </Link>
+              <Link to="/tokens" className="app-header__link" style={{ color: '#10b981', fontWeight: 600 }}>
+                🔑 API Tokens
+              </Link>
+            </>
           )}
           {isAdmin && (
             <Link to="/admin/settings" className="app-header__link" style={{ color: '#646cff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>

@@ -189,3 +189,13 @@ type AppSettings struct {
 	AllowUserArtistCreation bool `json:"allow_user_artist_creation"`
 	AllowUserPostCreation   bool `json:"allow_user_post_creation"`
 }
+
+type ApiToken struct {
+	ID          uuid.UUID  `json:"id"`
+	UserID      uuid.UUID  `json:"user_id"`
+	Name        string     `json:"name"`
+	TokenPrefix string     `json:"token_prefix"`
+	CreatedAt   time.Time  `json:"created_at"`
+	LastUsedAt  *time.Time `json:"last_used_at"`
+	Token       string     `json:"token,omitempty"` // populated only when newly created
+}

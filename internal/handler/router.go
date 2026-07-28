@@ -27,6 +27,7 @@ type Deps struct {
 	Users          *repository.UserRepo
 	Favorites      *repository.FavoriteRepo
 	Settings       *repository.SettingsRepo
+	ApiTokens      *repository.ApiTokenRepo
 	JWTSecret      string
 	AllowPublicReg bool
 	StaticDir      string
@@ -67,12 +68,13 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.JWTSecret, deps.AllowPublicReg)
 	favH := NewFavoriteHandler(deps.Favorites)
 	settingsH := NewSettingsHandler(deps.Settings, deps.Users)
+	tokenH := NewApiTokenHandler(deps)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		// Global settings & OpenAPI JSON (Public / Optional Auth)
 		r.Group(func(r chi.Router) {
-			r.Use(auth.OptionalAuth(deps.JWTSecret))
+			r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
 			r.Get("/settings", settingsH.GetSettings)
 			r.Get("/docs/openapi.json", docs.ServeOpenAPI)
 		})
@@ -82,12 +84,12 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		r.Route("/auth", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 				r.Use(authLimiter.Middleware)
-				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Post("/register", authH.Register)
 				r.Post("/login", authH.Login)
 			})
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/me", authH.GetMe)
 			})
 		})
@@ -95,8 +97,11 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		// User personal endpoints
 		r.Route("/users", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/me/favorites", favH.ListMyFavorites)
+				r.Get("/me/api-tokens", tokenH.ListTokens)
+				r.Post("/me/api-tokens", tokenH.CreateToken)
+				r.Delete("/me/api-tokens/{id}", tokenH.DeleteToken)
 			})
 		})
 
@@ -104,14 +109,14 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		r.Route("/artists", func(r chi.Router) {
 			// Public catalog read-only
 			r.Group(func(r chi.Router) {
-				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/", artistH.List)
 				r.Get("/{slug}", artistH.GetBySlug)
 				r.Get("/{slug}/posts", postH.ListByArtist)
 			})
 			// Protected creation and modifications
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Post("/", artistH.Create)
 				r.Put("/{id}", artistH.Update)
 				r.Delete("/{id}", artistH.Delete)
@@ -125,7 +130,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		r.Route("/posts", func(r chi.Router) {
 			// Public catalog read-only
 			r.Group(func(r chi.Router) {
-				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/recent", postH.Recent)
 				r.Get("/{id}", postH.GetByID)
 				r.Get("/{id}/adjacent", postH.GetAdjacent)
@@ -134,7 +139,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			})
 			// Protected creation and interaction
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Post("/", postH.Create)
 				r.Put("/{id}", postH.Update)
 				r.Delete("/{id}", postH.Delete)
@@ -159,25 +164,25 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		r.Route("/tags", func(r chi.Router) {
 			// Public read-only
 			r.Group(func(r chi.Router) {
-				r.Use(auth.OptionalAuth(deps.JWTSecret))
+				r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/", tagH.List)
 				r.Get("/{slug}/posts", tagH.GetPosts)
 			})
 			// Protected creation
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAuth(deps.JWTSecret))
+				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Post("/", tagH.Create)
 			})
 			// Admin-only deletion (Audit item 3.1)
 			r.Group(func(r chi.Router) {
-				r.Use(auth.RequireAdmin(deps.JWTSecret))
+				r.Use(auth.RequireAdmin(deps.JWTSecret, deps.ApiTokens))
 				r.Delete("/{id}", tagH.Delete)
 			})
 		})
 
 		// Admin endpoints
 		r.Route("/admin", func(r chi.Router) {
-			r.Use(auth.RequireAdmin(deps.JWTSecret))
+			r.Use(auth.RequireAdmin(deps.JWTSecret, deps.ApiTokens))
 			r.Put("/settings", settingsH.UpdateSettings)
 			r.Get("/users", settingsH.ListUsers)
 			r.Put("/users/{username}/role", settingsH.SetUserRole)

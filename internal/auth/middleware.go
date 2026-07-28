@@ -12,7 +12,18 @@ type contextKey string
 
 const claimsKey contextKey = "jwt_claims"
 
-func RequireAuth(secret string) func(http.Handler) http.Handler {
+type ApiTokenValidator interface {
+	ValidateApiToken(ctx context.Context, token string) (*Claims, error)
+}
+
+func validateTokenOrApi(ctx context.Context, secret, token string, validator ApiTokenValidator) (*Claims, error) {
+	if strings.HasPrefix(token, "eko_") && validator != nil {
+		return validator.ValidateApiToken(ctx, token)
+	}
+	return ValidateToken(secret, token)
+}
+
+func RequireAuth(secret string, validator ApiTokenValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
@@ -20,7 +31,7 @@ func RequireAuth(secret string) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"unauthorized: missing token"}`, http.StatusUnauthorized)
 				return
 			}
-			claims, err := ValidateToken(secret, token)
+			claims, err := validateTokenOrApi(r.Context(), secret, token, validator)
 			if err != nil {
 				http.Error(w, `{"error":"unauthorized: `+err.Error()+`"}`, http.StatusUnauthorized)
 				return
@@ -31,7 +42,7 @@ func RequireAuth(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-func RequireAdmin(secret string) func(http.Handler) http.Handler {
+func RequireAdmin(secret string, validator ApiTokenValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
@@ -39,7 +50,7 @@ func RequireAdmin(secret string) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"unauthorized: missing token"}`, http.StatusUnauthorized)
 				return
 			}
-			claims, err := ValidateToken(secret, token)
+			claims, err := validateTokenOrApi(r.Context(), secret, token, validator)
 			if err != nil {
 				http.Error(w, `{"error":"unauthorized: `+err.Error()+`"}`, http.StatusUnauthorized)
 				return
@@ -55,12 +66,12 @@ func RequireAdmin(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-func OptionalAuth(secret string) func(http.Handler) http.Handler {
+func OptionalAuth(secret string, validator ApiTokenValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
 			if token != "" {
-				if claims, err := ValidateToken(secret, token); err == nil {
+				if claims, err := validateTokenOrApi(r.Context(), secret, token, validator); err == nil {
 					ctx := context.WithValue(r.Context(), claimsKey, claims)
 					r = r.WithContext(ctx)
 				}

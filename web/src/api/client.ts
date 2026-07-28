@@ -46,7 +46,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   return res.json();
 }
 
-import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings } from '../types/models';
+import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings, ApiToken } from '../types/models';
 
 export const api = {
   // Artists
@@ -159,5 +159,15 @@ export const api = {
 
   setUserRole: (username: string, role: string) =>
     request<{ message: string }>(`/api/admin/users/${encodeURIComponent(username)}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+
+  // API Tokens
+  listApiTokens: () =>
+    request<{ tokens: ApiToken[] }>('/api/users/me/api-tokens'),
+
+  createApiToken: (name: string) =>
+    request<ApiToken>('/api/users/me/api-tokens', { method: 'POST', body: JSON.stringify({ name }) }),
+
+  deleteApiToken: (id: string) =>
+    request<{ message: string }>(`/api/users/me/api-tokens/${id}`, { method: 'DELETE' }),
 };
 

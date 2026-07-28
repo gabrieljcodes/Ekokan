@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
+import ApiTokensPage from './pages/ApiTokensPage';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/tokens" element={<ApiTokensPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="/artists/new" element={<CreateArtistPage />} />
             <Route path="/posts/new" element={<CreatePostPage />} />

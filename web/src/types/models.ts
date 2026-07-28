@@ -129,3 +129,12 @@ export interface AppSettings {
   allow_user_post_creation: boolean;
 }
 
+export interface ApiToken {
+  id: string;
+  user_id: string;
+  name: string;
+  token_prefix: string;
+  created_at: string;
+  last_used_at?: string;
+  token?: string;
+}

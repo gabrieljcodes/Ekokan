@@ -20,57 +20,147 @@
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Enter your User or Admin JWT Bearer token obtained from login or registration."
+        "bearerFormat": "JWT or API Token",
+        "description": "Enter either a short-lived session JWT or a long-lived API token generated from your user profile (starting with 'eko_')."
       }
     },
     "schemas": {
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "string"
+          }
         }
       },
       "Artist": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "user_id": { "type": "string", "format": "uuid" },
-          "name": { "type": "string" },
-          "slug": { "type": "string" },
-          "bio": { "type": "string" },
-          "avatar_url": { "type": "string" },
-          "banner_url": { "type": "string" },
-          "post_count": { "type": "integer" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": "string"
+          },
+          "banner_url": {
+            "type": "string"
+          },
+          "post_count": {
+            "type": "integer"
+          }
         }
       },
       "Post": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "user_id": { "type": "string", "format": "uuid" },
-          "artist_id": { "type": "string", "format": "uuid" },
-          "title": { "type": "string" },
-          "slug": { "type": "string" },
-          "content": { "type": "string" },
-          "like_count": { "type": "integer" },
-          "comment_count": { "type": "integer" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artist_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "like_count": {
+            "type": "integer"
+          },
+          "comment_count": {
+            "type": "integer"
+          }
         }
       },
       "User": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "username": { "type": "string" },
-          "display_name": { "type": "string" },
-          "role": { "type": "string", "enum": ["user", "admin"] }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          }
         }
       },
       "AppSettings": {
         "type": "object",
         "properties": {
-          "allow_user_artist_creation": { "type": "boolean" },
-          "allow_user_post_creation": { "type": "boolean" }
+          "allow_user_artist_creation": {
+            "type": "boolean"
+          },
+          "allow_user_post_creation": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiToken": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "kemono-dl automation"
+          },
+          "token_prefix": {
+            "type": "string",
+            "example": "eko_1a2b3c4d"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token": {
+            "type": "string",
+            "description": "Full plaintext API token, returned ONLY upon initial creation.",
+            "example": "eko_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+          }
         }
       }
     }
@@ -78,7 +168,9 @@
   "paths": {
     "/api/auth/login": {
       "post": {
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Login with username and password",
         "requestBody": {
           "required": true,
@@ -86,10 +178,17 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["username", "password"],
+                "required": [
+                  "username",
+                  "password"
+                ],
                 "properties": {
-                  "username": { "type": "string" },
-                  "password": { "type": "string" }
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -103,20 +202,28 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": { "type": "string" },
-                    "user": { "$ref": "#/components/schemas/User" }
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "description": "Invalid credentials" }
+          "401": {
+            "description": "Invalid credentials"
+          }
         }
       }
     },
     "/api/auth/register": {
       "post": {
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Register a new user account",
         "requestBody": {
           "required": true,
@@ -124,78 +231,149 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["username", "password", "display_name"],
+                "required": [
+                  "username",
+                  "password",
+                  "display_name"
+                ],
                 "properties": {
-                  "username": { "type": "string" },
-                  "password": { "type": "string" },
-                  "display_name": { "type": "string" }
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "display_name": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "User created successfully" },
-          "400": { "description": "Registration failed" }
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Registration failed"
+          }
         }
       }
     },
     "/api/auth/me": {
       "get": {
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Get authenticated user profile",
-        "security": [{ "BearerAuth": [] }],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
-          "200": { "description": "User profile data" },
-          "401": { "description": "Unauthorized token" }
+          "200": {
+            "description": "User profile data"
+          },
+          "401": {
+            "description": "Unauthorized token"
+          }
         }
       }
     },
     "/api/settings": {
       "get": {
-        "tags": ["Settings & Admin"],
+        "tags": [
+          "Settings & Admin"
+        ],
         "summary": "Get global application permissions and settings",
         "responses": {
           "200": {
             "description": "App settings values",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppSettings" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettings"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/admin/settings": {
       "put": {
-        "tags": ["Settings & Admin"],
-        "summary": "Update global permissions (Requires Admin Token)",
-        "security": [{ "BearerAuth": [] }],
+        "tags": [
+          "Settings & Admin"
+        ],
+        "summary": "Update global permissions",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppSettings" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppSettings"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "Settings updated" },
-          "403": { "description": "Forbidden: Admin access required" }
+          "200": {
+            "description": "Settings updated"
+          },
+          "403": {
+            "description": "Forbidden: Admin access required"
+          }
         }
       }
     },
     "/api/admin/users": {
       "get": {
-        "tags": ["Settings & Admin"],
-        "summary": "List all registered users (Requires Admin Token)",
-        "security": [{ "BearerAuth": [] }],
+        "tags": [
+          "Settings & Admin"
+        ],
+        "summary": "List all registered users",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
-          "200": { "description": "List of users" },
-          "403": { "description": "Forbidden: Admin access required" }
+          "200": {
+            "description": "List of users"
+          },
+          "403": {
+            "description": "Forbidden: Admin access required"
+          }
         }
       }
     },
     "/api/admin/users/{username}/role": {
       "put": {
-        "tags": ["Settings & Admin"],
-        "summary": "Promote or demote user roles (Requires Admin Token)",
-        "security": [{ "BearerAuth": [] }],
+        "tags": [
+          "Settings & Admin"
+        ],
+        "summary": "Promote or demote user roles",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "username", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -204,231 +382,690 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "role": { "type": "string", "enum": ["user", "admin"] }
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "admin"
+                    ]
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Role updated successfully" }
+          "200": {
+            "description": "Role updated successfully"
+          }
         }
       }
     },
     "/api/artists": {
       "get": {
-        "tags": ["Artists"],
+        "tags": [
+          "Artists"
+        ],
         "summary": "List all artist profiles with pagination and optional search",
         "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer" } },
-          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
-          { "name": "q", "in": "query", "schema": { "type": "string" } }
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Paginated artists list" }
+          "200": {
+            "description": "Paginated artists list"
+          }
         }
       },
       "post": {
-        "tags": ["Artists"],
-        "summary": "Create a new artist profile (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
+        "tags": [
+          "Artists"
+        ],
+        "summary": "Create a new artist profile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name", "slug"],
+                "required": [
+                  "name",
+                  "slug"
+                ],
                 "properties": {
-                  "name": { "type": "string" },
-                  "slug": { "type": "string" },
-                  "bio": { "type": "string" },
-                  "links": { "type": "object" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "bio": {
+                    "type": "string"
+                  },
+                  "links": {
+                    "type": "object"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Artist created successfully" },
-          "401": { "description": "Unauthorized token" }
+          "201": {
+            "description": "Artist created successfully"
+          },
+          "401": {
+            "description": "Unauthorized token"
+          }
         }
       }
     },
     "/api/artists/{id}": {
       "put": {
-        "tags": ["Artists"],
-        "summary": "Update artist profile (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "Artists"
         ],
-        "responses": { "200": { "description": "Artist updated" } }
+        "summary": "Update artist profile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artist updated"
+          }
+        }
       },
       "delete": {
-        "tags": ["Artists"],
-        "summary": "Delete artist profile (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "Artists"
         ],
-        "responses": { "200": { "description": "Artist deleted" } }
+        "summary": "Delete artist profile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artist deleted"
+          }
+        }
       }
     },
     "/api/artists/{id}/avatar": {
       "post": {
-        "tags": ["Artists"],
-        "summary": "Upload artist avatar image (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Avatar uploaded" } }
+        "tags": [
+          "Artists"
+        ],
+        "summary": "Upload artist avatar image",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avatar uploaded"
+          }
+        }
       }
     },
     "/api/artists/{id}/banner": {
       "post": {
-        "tags": ["Artists"],
-        "summary": "Upload artist banner image (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Banner uploaded" } }
+        "tags": [
+          "Artists"
+        ],
+        "summary": "Upload artist banner image",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Banner uploaded"
+          }
+        }
       }
     },
     "/api/posts": {
       "post": {
-        "tags": ["Posts"],
-        "summary": "Create a new artwork post (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Create a new artwork post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["artist_id", "title", "slug"],
+                "required": [
+                  "artist_id",
+                  "title",
+                  "slug"
+                ],
                 "properties": {
-                  "artist_id": { "type": "string", "format": "uuid" },
-                  "title": { "type": "string" },
-                  "slug": { "type": "string" },
-                  "content": { "type": "string" },
-                  "source_url": { "type": "string" }
+                  "artist_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Post created" },
-          "401": { "description": "Unauthorized token" }
+          "201": {
+            "description": "Post created"
+          },
+          "401": {
+            "description": "Unauthorized token"
+          }
         }
       }
     },
     "/api/posts/recent": {
       "get": {
-        "tags": ["Posts"],
+        "tags": [
+          "Posts"
+        ],
         "summary": "Get most recent artwork posts across all artists",
-        "responses": { "200": { "description": "Recent posts list" } }
+        "responses": {
+          "200": {
+            "description": "Recent posts list"
+          }
+        }
       }
     },
     "/api/posts/{id}": {
       "get": {
-        "tags": ["Posts"],
+        "tags": [
+          "Posts"
+        ],
         "summary": "Get full post details including media and comments",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Post details" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post details"
+          }
+        }
       },
       "put": {
-        "tags": ["Posts"],
-        "summary": "Update artwork post (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Post updated" } }
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Update artwork post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post updated"
+          }
+        }
       },
       "delete": {
-        "tags": ["Posts"],
-        "summary": "Delete artwork post and orphaned files (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Post deleted" } }
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Delete artwork post and orphaned files",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post deleted"
+          }
+        }
       }
     },
     "/api/posts/{id}/media": {
       "post": {
-        "tags": ["Media & Attachments"],
-        "summary": "Upload gallery media image/video for post (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Media uploaded" } }
+        "tags": [
+          "Media & Attachments"
+        ],
+        "summary": "Upload gallery media image/video for post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Media uploaded"
+          }
+        }
       }
     },
     "/api/posts/{id}/attachments": {
       "post": {
-        "tags": ["Media & Attachments"],
-        "summary": "Upload downloadable zip/archive attachment (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Attachment uploaded" } }
+        "tags": [
+          "Media & Attachments"
+        ],
+        "summary": "Upload downloadable zip/archive attachment",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment uploaded"
+          }
+        }
       }
     },
     "/api/posts/{id}/like": {
       "post": {
-        "tags": ["Favorites & Likes"],
-        "summary": "Toggle Like status on post (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Like toggled" } }
+        "tags": [
+          "Favorites & Likes"
+        ],
+        "summary": "Toggle Like status on post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Like toggled"
+          }
+        }
       }
     },
     "/api/posts/{id}/favorite": {
       "post": {
-        "tags": ["Favorites & Likes"],
-        "summary": "Toggle Favorite status on post (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Favorite toggled" } }
+        "tags": [
+          "Favorites & Likes"
+        ],
+        "summary": "Toggle Favorite status on post",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Favorite toggled"
+          }
+        }
       }
     },
     "/api/posts/{id}/comments": {
       "get": {
-        "tags": ["Comments"],
+        "tags": [
+          "Comments"
+        ],
         "summary": "List comment thread for post",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "List of comments" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of comments"
+          }
+        }
       },
       "post": {
-        "tags": ["Comments"],
-        "summary": "Post a new comment or reply (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "tags": [
+          "Comments"
+        ],
+        "summary": "Post a new comment or reply",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["content"],
+                "required": [
+                  "content"
+                ],
                 "properties": {
-                  "content": { "type": "string" },
-                  "parent_id": { "type": "string", "format": "uuid" },
-                  "author_name": { "type": "string" }
+                  "content": {
+                    "type": "string"
+                  },
+                  "parent_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "author_name": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "201": { "description": "Comment published" } }
+        "responses": {
+          "201": {
+            "description": "Comment published"
+          }
+        }
       }
     },
     "/api/tags": {
       "get": {
-        "tags": ["Tags"],
+        "tags": [
+          "Tags"
+        ],
         "summary": "List all registered taxonomy tags",
-        "responses": { "200": { "description": "Tags list" } }
+        "responses": {
+          "200": {
+            "description": "Tags list"
+          }
+        }
       },
       "post": {
-        "tags": ["Tags"],
-        "summary": "Create or get tag (Requires Token)",
-        "security": [{ "BearerAuth": [] }],
-        "responses": { "200": { "description": "Tag returned" } }
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Create or get tag",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tag returned"
+          }
+        }
+      }
+    },
+    "/api/users/me/api-tokens": {
+      "get": {
+        "tags": [
+          "Authentication & Users"
+        ],
+        "summary": "List all active API tokens for the authenticated user",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of active API tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiToken"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Authentication & Users"
+        ],
+        "summary": "Generate a new long-lived API token for external tools (e.g., kemono-dl)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "kemono-dl automation"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API token generated successfully. Note: Plaintext token is only returned once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/users/me/api-tokens/{id}": {
+      "delete": {
+        "tags": [
+          "Authentication & Users"
+        ],
+        "summary": "Revoke and delete an active API token",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID of the API token to revoke"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token revoked successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Token not found"
+          }
+        }
       }
     }
   }

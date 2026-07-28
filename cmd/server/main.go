@@ -67,6 +67,7 @@ func main() {
 	userRepo := repository.NewUserRepo(pool)
 	favoriteRepo := repository.NewFavoriteRepo(pool, store)
 	settingsRepo := repository.NewSettingsRepo(pool)
+	apiTokenRepo := repository.NewApiTokenRepo(pool)
 
 	// CLI Console Commands
 	if len(os.Args) >= 3 && (strings.EqualFold(os.Args[1], "make-admin") || strings.EqualFold(os.Args[1], "promote") || strings.EqualFold(os.Args[1], "admin") || strings.EqualFold(os.Args[1], "-make-admin")) {
@@ -95,6 +96,7 @@ func main() {
 		Users:          userRepo,
 		Favorites:      favoriteRepo,
 		Settings:       settingsRepo,
+		ApiTokens:      apiTokenRepo,
 		JWTSecret:      cfg.JWTSecret,
 		AllowPublicReg: cfg.AllowPublicReg,
 		StaticDir:      cfg.StaticDir,
