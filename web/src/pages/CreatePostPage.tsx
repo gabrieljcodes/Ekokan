@@ -298,8 +298,8 @@ export default function CreatePostPage() {
           {/* Published At Date / Time */}
           <div className="form-group">
             <label htmlFor="create-published-at" className="form-label">
-              📅 Published Date & Time
-              <span className="form-label__hint">Original publication timestamp</span>
+              Published Date & Time
+              <span className="form-label__hint">Optional</span>
             </label>
             <input
               id="create-published-at"
@@ -307,20 +307,10 @@ export default function CreatePostPage() {
               value={publishedAt}
               onChange={(e) => setPublishedAt(e.target.value)}
               disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                background: 'rgba(0,0,0,0.3)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#fff',
-                fontSize: '14px',
-                outline: 'none',
-                colorScheme: 'dark'
-              }}
+              style={{ colorScheme: 'dark', width: '100%' }}
             />
-            <span className="form-helper" style={{ display: 'block', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Set the historical date when this artwork or content was originally published by the artist. Defaults to current date if left untouched.
+            <span className="form-helper">
+              Set the original publication timestamp of this artwork or post. Defaults to the current time if unchanged.
             </span>
           </div>
 
