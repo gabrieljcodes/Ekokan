@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"ekokan/internal/auth"
@@ -44,6 +45,24 @@ func (h *PostHandler) checkPostOwnership(w http.ResponseWriter, r *http.Request,
 	return true
 }
 
+func parseTagFilters(r *http.Request) (inc []uuid.UUID, exc []uuid.UUID) {
+	if s := r.URL.Query().Get("include_tags"); s != "" {
+		for _, part := range strings.Split(s, ",") {
+			if id, err := uuid.Parse(strings.TrimSpace(part)); err == nil {
+				inc = append(inc, id)
+			}
+		}
+	}
+	if s := r.URL.Query().Get("exclude_tags"); s != "" {
+		for _, part := range strings.Split(s, ",") {
+			if id, err := uuid.Parse(strings.TrimSpace(part)); err == nil {
+				exc = append(exc, id)
+			}
+		}
+	}
+	return inc, exc
+}
+
 func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	artist, err := h.artists.GetBySlug(r.Context(), slug)
@@ -61,8 +80,9 @@ func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
 	if search == "" {
 		search = r.URL.Query().Get("q")
 	}
+	inc, exc := parseTagFilters(r)
 
-	result, err := h.posts.ListByArtist(r.Context(), artist.ID, models.PaginationParams{Page: page, PerPage: perPage}, search)
+	result, err := h.posts.ListByArtist(r.Context(), artist.ID, models.PaginationParams{Page: page, PerPage: perPage}, search, inc, exc)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -365,7 +385,8 @@ func (h *PostHandler) RemoveAttachment(w http.ResponseWriter, r *http.Request) {
 
 func (h *PostHandler) Recent(w http.ResponseWriter, r *http.Request) {
 	page, perPage := parsePageParams(r)
-	result, err := h.posts.Recent(r.Context(), models.PaginationParams{Page: page, PerPage: perPage})
+	inc, exc := parseTagFilters(r)
+	result, err := h.posts.Recent(r.Context(), models.PaginationParams{Page: page, PerPage: perPage}, inc, exc)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

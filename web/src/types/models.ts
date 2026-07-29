@@ -38,6 +38,8 @@ export interface User {
   username: string;
   email?: string;
   display_name?: string;
+  avatar_file_id?: string;
+  avatar_url?: string;
   role: string;
   is_active: boolean;
   created_at: string;

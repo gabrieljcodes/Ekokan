@@ -7,22 +7,29 @@ import (
 	"time"
 
 	"ekokan/internal/auth"
+	"ekokan/internal/models"
 	"ekokan/internal/repository"
+	"ekokan/internal/storage"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
 	users          *repository.UserRepo
 	favs           *repository.FavoriteRepo
+	files          *repository.FileRepo
+	store          *storage.OpenDALStore
 	jwtSecret      string
 	allowPublicReg bool
 }
 
-func NewAuthHandler(users *repository.UserRepo, favs *repository.FavoriteRepo, jwtSecret string, allowPublicReg bool) *AuthHandler {
+func NewAuthHandler(users *repository.UserRepo, favs *repository.FavoriteRepo, files *repository.FileRepo, store *storage.OpenDALStore, jwtSecret string, allowPublicReg bool) *AuthHandler {
 	return &AuthHandler{
 		users:          users,
 		favs:           favs,
+		files:          files,
+		store:          store,
 		jwtSecret:      jwtSecret,
 		allowPublicReg: allowPublicReg,
 	}
@@ -101,6 +108,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		"favorited_post_ids":   []string{},
 		"favorited_artist_ids": []string{},
 		"liked_post_ids":       []string{},
+		"excluded_tag_ids":     []string{},
 	})
 }
 
@@ -136,6 +144,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	favPosts, _ := h.favs.ListUserFavPostIDs(r.Context(), user.ID)
 	favArtists, _ := h.favs.ListUserFavArtistIDs(r.Context(), user.ID)
 	likedPosts, _ := h.favs.ListUserLikedPostIDs(r.Context(), user.ID)
+	excludedTags, _ := h.users.ListUserExcludedTagIDs(r.Context(), user.ID)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token":                token,
@@ -143,6 +152,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"favorited_post_ids":   favPosts,
 		"favorited_artist_ids": favArtists,
 		"liked_post_ids":       likedPosts,
+		"excluded_tag_ids":     excludedTags,
 	})
 }
 
@@ -162,11 +172,100 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	favPosts, _ := h.favs.ListUserFavPostIDs(r.Context(), user.ID)
 	favArtists, _ := h.favs.ListUserFavArtistIDs(r.Context(), user.ID)
 	likedPosts, _ := h.favs.ListUserLikedPostIDs(r.Context(), user.ID)
+	excludedTags, _ := h.users.ListUserExcludedTagIDs(r.Context(), user.ID)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":                 user,
 		"favorited_post_ids":   favPosts,
 		"favorited_artist_ids": favArtists,
 		"liked_post_ids":       likedPosts,
+		"excluded_tag_ids":     excludedTags,
+	})
+}
+
+func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB limit for avatar
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close()
+
+	result, err := storage.ProcessUpload(r.Context(), h.store, header.Filename, file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	fileModel := &models.File{
+		SHA256:         result.SHA256,
+		FilePath:       result.FilePath,
+		OriginalName:   result.OriginalName,
+		MimeType:       result.MimeType,
+		FileSize:       result.FileSize,
+		StorageBackend: "fs",
+	}
+
+	_, err = h.files.FindOrCreate(r.Context(), fileModel)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	err = h.users.UpdateAvatar(r.Context(), userID, fileModel.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update user avatar")
+		return
+	}
+
+	user, err := h.users.GetByID(r.Context(), userID)
+	if err != nil || user == nil {
+		writeError(w, http.StatusInternalServerError, "failed to load updated user")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+type excludedTagsRequest struct {
+	TagIDs []string `json:"tag_ids"`
+}
+
+func (h *AuthHandler) SetExcludedTags(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req excludedTagsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	var uuids []uuid.UUID
+	for _, idStr := range req.TagIDs {
+		if id, err := uuid.Parse(idStr); err == nil {
+			uuids = append(uuids, id)
+		}
+	}
+
+	if err := h.users.SetUserExcludedTags(r.Context(), userID, uuids); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update excluded tags: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":          true,
+		"excluded_tag_ids": req.TagIDs,
 	})
 }

@@ -64,7 +64,7 @@ func main() {
 	postRepo := repository.NewPostRepo(pool, store)
 	tagRepo := repository.NewTagRepo(pool)
 	commentRepo := repository.NewCommentRepo(pool)
-	userRepo := repository.NewUserRepo(pool)
+	userRepo := repository.NewUserRepo(pool, store)
 	favoriteRepo := repository.NewFavoriteRepo(pool, store)
 	settingsRepo := repository.NewSettingsRepo(pool)
 	apiTokenRepo := repository.NewApiTokenRepo(pool)

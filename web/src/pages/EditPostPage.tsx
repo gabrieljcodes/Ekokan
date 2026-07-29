@@ -21,9 +21,23 @@ export default function EditPostPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [artistSlug, setArtistSlug] = useState<string>(urlArtistSlug || '');
 
+  const toDatetimeLocal = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+      const local = new Date(date.getTime() - offsetMs);
+      return local.toISOString().slice(0, 16);
+    } catch {
+      return '';
+    }
+  };
+
   // Form fields
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [publishedAt, setPublishedAt] = useState('');
 
   // Tags
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
@@ -59,6 +73,7 @@ export default function EditPostPage() {
       setPost(fetchedPost);
       setTitle(fetchedPost.title || '');
       setContent(fetchedPost.content || '');
+      setPublishedAt(toDatetimeLocal(fetchedPost.published_at));
       setSelectedTagIds(fetchedPost.tags ? fetchedPost.tags.map((t) => t.id) : []);
       setExistingMedia(fetchedPost.media || []);
       setExistingAttachments(fetchedPost.attachments || []);
@@ -185,7 +200,8 @@ export default function EditPostPage() {
       await api.updatePost(postId, {
         title: title.trim(),
         content: content.trim() || '',
-        tag_ids: selectedTagIds
+        tag_ids: selectedTagIds,
+        published_at: publishedAt ? new Date(publishedAt).toISOString() : undefined,
       });
 
       const totalNewFiles = newMediaItems.length + newAttachmentItems.length;
@@ -281,6 +297,35 @@ export default function EditPostPage() {
               disabled={saving}
               placeholder="Add details, notes, or links..."
             />
+          </div>
+
+          {/* Published At Date / Time */}
+          <div className="form-group">
+            <label htmlFor="edit-published-at" style={{ display: 'block', marginBottom: '6px', fontWeight: 600, color: '#fff' }}>
+              📅 Published Date & Time
+            </label>
+            <input
+              id="edit-published-at"
+              type="datetime-local"
+              className="form-input"
+              value={publishedAt}
+              onChange={(e) => setPublishedAt(e.target.value)}
+              disabled={saving}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff',
+                fontSize: '14px',
+                outline: 'none',
+                colorScheme: 'dark'
+              }}
+            />
+            <span style={{ display: 'block', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Change the historical publication date of this post.
+            </span>
           </div>
 
           <hr style={{ borderColor: 'var(--border-color)', margin: 'var(--space-lg) 0' }} />

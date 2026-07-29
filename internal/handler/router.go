@@ -65,7 +65,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Settings, deps.Store)
 	tagH := NewTagHandler(deps.Tags, deps.Posts)
 	commentH := NewCommentHandler(deps.Comments, deps.Posts, deps.Users)
-	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.JWTSecret, deps.AllowPublicReg)
+	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.Files, deps.Store, deps.JWTSecret, deps.AllowPublicReg)
 	favH := NewFavoriteHandler(deps.Favorites)
 	settingsH := NewSettingsHandler(deps.Settings, deps.Users)
 	tokenH := NewApiTokenHandler(deps)
@@ -102,6 +102,8 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Get("/me/api-tokens", tokenH.ListTokens)
 				r.Post("/me/api-tokens", tokenH.CreateToken)
 				r.Delete("/me/api-tokens/{id}", tokenH.DeleteToken)
+				r.Post("/me/avatar", authH.UploadAvatar)
+				r.Post("/me/excluded-tags", authH.SetExcludedTags)
 			})
 		})
 

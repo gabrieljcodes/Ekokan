@@ -27,6 +27,14 @@ export default function CreatePostPage() {
   const [customSlug, setCustomSlug] = useState(false);
   const [content, setContent] = useState('');
 
+  const getInitialLocalDatetime = () => {
+    const now = new Date();
+    const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+    const local = new Date(now.getTime() - offsetMs);
+    return local.toISOString().slice(0, 16);
+  };
+  const [publishedAt, setPublishedAt] = useState(getInitialLocalDatetime);
+
   // Tags
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -156,7 +164,8 @@ export default function CreatePostPage() {
         title: title.trim(),
         slug: slug.trim(),
         content: content.trim() || undefined,
-        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        published_at: publishedAt ? new Date(publishedAt).toISOString() : undefined,
       });
 
       const totalFiles = mediaItems.length + attachmentItems.length;
@@ -284,6 +293,35 @@ export default function CreatePostPage() {
               onChange={(e) => setContent(e.target.value)}
               disabled={loading}
             />
+          </div>
+
+          {/* Published At Date / Time */}
+          <div className="form-group">
+            <label htmlFor="create-published-at" className="form-label">
+              📅 Published Date & Time
+              <span className="form-label__hint">Original publication timestamp</span>
+            </label>
+            <input
+              id="create-published-at"
+              type="datetime-local"
+              value={publishedAt}
+              onChange={(e) => setPublishedAt(e.target.value)}
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff',
+                fontSize: '14px',
+                outline: 'none',
+                colorScheme: 'dark'
+              }}
+            />
+            <span className="form-helper" style={{ display: 'block', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Set the historical date when this artwork or content was originally published by the artist. Defaults to current date if left untouched.
+            </span>
           </div>
 
           {/* Tags Picker & Creator */}

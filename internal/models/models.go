@@ -30,6 +30,7 @@ type User struct {
 	PasswordHash *string    `json:"-"`
 	DisplayName  *string    `json:"display_name,omitempty"`
 	AvatarFileID *uuid.UUID `json:"avatar_file_id,omitempty"`
+	AvatarURL    string     `json:"avatar_url,omitempty"`
 	Role         string     `json:"role"`
 	IsActive     bool       `json:"is_active"`
 	CreatedAt    time.Time  `json:"created_at"`

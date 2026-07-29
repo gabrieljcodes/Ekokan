@@ -11,6 +11,7 @@ interface AuthContextType {
   favoritedPostIds: Set<string>;
   favoritedArtistIds: Set<string>;
   likedPostIds: Set<string>;
+  excludedTagIds: Set<string>;
   login: (data: { username: string; password: string }) => Promise<void>;
   register: (data: { username: string; email?: string; password: string; display_name?: string }) => Promise<void>;
   logout: () => void;
@@ -20,6 +21,8 @@ interface AuthContextType {
   isFavoritePost: (postId: string) => boolean;
   isFavoriteArtist: (artistId: string) => boolean;
   isLikedPost: (postId: string) => boolean;
+  saveExcludedTags: (tagIds: string[]) => Promise<void>;
+  updateUserAvatar: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [favoritedPostIds, setFavoritedPostIds] = useState<Set<string>>(new Set());
   const [favoritedArtistIds, setFavoritedArtistIds] = useState<Set<string>>(new Set());
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [excludedTagIds, setExcludedTagIds] = useState<Set<string>>(new Set());
 
   const refreshSettings = async () => {
     try {
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFavoritedPostIds(new Set(res.favorited_post_ids || []));
         setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
         setLikedPostIds(new Set(res.liked_post_ids || []));
+        setExcludedTagIds(new Set(res.excluded_tag_ids || []));
       })
       .catch(() => {
         localStorage.removeItem('ekokan_token');
@@ -72,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFavoritedPostIds(new Set(res.favorited_post_ids || []));
     setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
     setLikedPostIds(new Set(res.liked_post_ids || []));
+    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
   };
 
   const register = async (data: { username: string; email?: string; password: string; display_name?: string }) => {
@@ -82,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFavoritedPostIds(new Set(res.favorited_post_ids || []));
     setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
     setLikedPostIds(new Set(res.liked_post_ids || []));
+    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
   };
 
   const logout = () => {
@@ -91,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFavoritedPostIds(new Set());
     setFavoritedArtistIds(new Set());
     setLikedPostIds(new Set());
+    setExcludedTagIds(new Set());
   };
 
   const toggleFavoritePost = async (postId: string): Promise<boolean> => {
@@ -133,6 +141,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isFavoriteArtist = (artistId: string) => favoritedArtistIds.has(artistId);
   const isLikedPost = (postId: string) => likedPostIds.has(postId);
 
+  const saveExcludedTags = async (tagIds: string[]) => {
+    if (!user) throw new Error('Please login to set persistent tag filters');
+    const res = await api.setExcludedTags(tagIds);
+    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
+  };
+
+  const updateUserAvatar = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -144,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         favoritedPostIds,
         favoritedArtistIds,
         likedPostIds,
+        excludedTagIds,
         login,
         register,
         logout,
@@ -153,6 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isFavoritePost,
         isFavoriteArtist,
         isLikedPost,
+        saveExcludedTags,
+        updateUserAvatar,
       }}
     >
       {children}

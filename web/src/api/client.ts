@@ -71,8 +71,11 @@ export const api = {
   deleteArtist: (id: string) =>
     request<void>(`/api/artists/${id}`, { method: 'DELETE' }),
 
-  listArtistPosts: (slug: string, page = 1, perPage = 25, search = '') =>
-    request<PaginatedResult<Post>>(`/api/artists/${slug}/posts?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`),
+  listArtistPosts: (slug: string, page = 1, perPage = 25, search = '', includeTags: string[] = [], excludeTags: string[] = []) => {
+    const inc = includeTags.length > 0 ? `&include_tags=${encodeURIComponent(includeTags.join(','))}` : '';
+    const exc = excludeTags.length > 0 ? `&exclude_tags=${encodeURIComponent(excludeTags.join(','))}` : '';
+    return request<PaginatedResult<Post>>(`/api/artists/${slug}/posts?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}${inc}${exc}`);
+  },
 
   getPost: (id: string) =>
     request<Post>(`/api/posts/${id}`),
@@ -80,10 +83,13 @@ export const api = {
   getAdjacentPosts: (id: string) =>
     request<AdjacentPosts>(`/api/posts/${id}/adjacent`),
 
-  getRecentPosts: (page = 1, perPage = 25) =>
-    request<PaginatedResult<Post>>(`/api/posts/recent?page=${page}&per_page=${perPage}`),
+  getRecentPosts: (page = 1, perPage = 25, includeTags: string[] = [], excludeTags: string[] = []) => {
+    const inc = includeTags.length > 0 ? `&include_tags=${encodeURIComponent(includeTags.join(','))}` : '';
+    const exc = excludeTags.length > 0 ? `&exclude_tags=${encodeURIComponent(excludeTags.join(','))}` : '';
+    return request<PaginatedResult<Post>>(`/api/posts/recent?page=${page}&per_page=${perPage}${inc}${exc}`);
+  },
 
-  createPost: (data: { artist_id: string; title: string; slug: string; content?: string; tag_ids?: string[] }) =>
+  createPost: (data: { artist_id: string; title: string; slug: string; content?: string; tag_ids?: string[]; published_at?: string }) =>
     request<Post>('/api/posts', { method: 'POST', body: JSON.stringify(data) }),
 
   updatePost: (id: string, data: Record<string, unknown>) =>
@@ -131,13 +137,19 @@ export const api = {
 
   // Auth
   register: (data: { username: string; email?: string; password: string; display_name?: string }) =>
-    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[]; excluded_tag_ids?: string[] }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
 
   login: (data: { username: string; password: string }) =>
-    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ token: string; user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[]; excluded_tag_ids?: string[] }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
 
   getMe: () =>
-    request<{ user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[] }>('/api/auth/me'),
+    request<{ user: User; favorited_post_ids: string[]; favorited_artist_ids: string[]; liked_post_ids?: string[]; excluded_tag_ids?: string[] }>('/api/auth/me'),
+
+  uploadUserAvatar: (file: globalThis.File) =>
+    uploadFile<User>('/api/users/me/avatar', file),
+
+  setExcludedTags: (tagIds: string[]) =>
+    request<{ success: boolean; excluded_tag_ids: string[] }>('/api/users/me/excluded-tags', { method: 'POST', body: JSON.stringify({ tag_ids: tagIds }) }),
 
   // Favorites & Likes
   togglePostFavorite: (postId: string) =>

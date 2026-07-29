@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"ekokan/internal/models"
@@ -23,51 +24,43 @@ func NewPostRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *PostRepo {
 	return &PostRepo{pool: pool, store: store}
 }
 
-func (r *PostRepo) ListByArtist(ctx context.Context, artistID uuid.UUID, params models.PaginationParams, search string) (*models.PaginatedResult[models.Post], error) {
-	var total int
-	var countQuery string
-	var countArgs []any
+func (r *PostRepo) ListByArtist(ctx context.Context, artistID uuid.UUID, params models.PaginationParams, search string, includeTags []uuid.UUID, excludeTags []uuid.UUID) (*models.PaginatedResult[models.Post], error) {
+	whereClauses := []string{"p.artist_id = $1"}
+	args := []any{artistID}
 
 	if search != "" {
-		countQuery = `SELECT count(*) FROM posts WHERE artist_id = $1 AND (title ILIKE $2 OR content ILIKE $2)`
-		countArgs = []any{artistID, "%" + search + "%"}
-	} else {
-		countQuery = `SELECT count(*) FROM posts WHERE artist_id = $1`
-		countArgs = []any{artistID}
+		args = append(args, "%"+search+"%")
+		whereClauses = append(whereClauses, fmt.Sprintf("(p.title ILIKE $%d OR p.content ILIKE $%d)", len(args), len(args)))
+	}
+	if len(includeTags) > 0 {
+		args = append(args, includeTags)
+		whereClauses = append(whereClauses, fmt.Sprintf("p.id IN (SELECT post_id FROM post_tags WHERE tag_id = ANY($%d::uuid[]))", len(args)))
+	}
+	if len(excludeTags) > 0 {
+		args = append(args, excludeTags)
+		whereClauses = append(whereClauses, fmt.Sprintf("p.id NOT IN (SELECT post_id FROM post_tags WHERE tag_id = ANY($%d::uuid[]))", len(args)))
 	}
 
-	if err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+	whereStr := strings.Join(whereClauses, " AND ")
+	countQuery := "SELECT count(*) FROM posts p WHERE " + whereStr
+
+	var total int
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("counting posts: %w", err)
 	}
 
-	var query string
-	var args []any
+	query := fmt.Sprintf(`
+		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
+		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
+		       p.comment_count, p.like_count, p.created_at, p.updated_at
+		FROM posts p
+		WHERE %s
+		ORDER BY p.published_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereStr, len(args)+1, len(args)+2)
 
-	if search != "" {
-		query = `
-			SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
-			       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-			       p.comment_count, p.like_count, p.created_at, p.updated_at
-			FROM posts p
-			WHERE p.artist_id = $1 AND (p.title ILIKE $2 OR p.content ILIKE $2)
-			ORDER BY p.published_at DESC
-			LIMIT $3 OFFSET $4
-		`
-		args = []any{artistID, "%" + search + "%", params.Limit(), params.Offset()}
-	} else {
-		query = `
-			SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
-			       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-			       p.comment_count, p.like_count, p.created_at, p.updated_at
-			FROM posts p
-			WHERE p.artist_id = $1
-			ORDER BY p.published_at DESC
-			LIMIT $2 OFFSET $3
-		`
-		args = []any{artistID, params.Limit(), params.Offset()}
-	}
-
-	rows, err := r.pool.Query(ctx, query, args...)
+	queryArgs := append(args, params.Limit(), params.Offset())
+	rows, err := r.pool.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("listing posts: %w", err)
 	}
@@ -363,20 +356,41 @@ func (r *PostRepo) ListByTag(ctx context.Context, tagID uuid.UUID, params models
 }
 
 // Recent returns recent posts across all artists
-func (r *PostRepo) Recent(ctx context.Context, params models.PaginationParams) (*models.PaginatedResult[models.Post], error) {
+func (r *PostRepo) Recent(ctx context.Context, params models.PaginationParams, includeTags []uuid.UUID, excludeTags []uuid.UUID) (*models.PaginatedResult[models.Post], error) {
+	var whereClauses []string
+	var args []any
+
+	if len(includeTags) > 0 {
+		args = append(args, includeTags)
+		whereClauses = append(whereClauses, fmt.Sprintf("p.id IN (SELECT post_id FROM post_tags WHERE tag_id = ANY($%d::uuid[]))", len(args)))
+	}
+	if len(excludeTags) > 0 {
+		args = append(args, excludeTags)
+		whereClauses = append(whereClauses, fmt.Sprintf("p.id NOT IN (SELECT post_id FROM post_tags WHERE tag_id = ANY($%d::uuid[]))", len(args)))
+	}
+
+	whereStr := ""
+	if len(whereClauses) > 0 {
+		whereStr = " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	countQuery := "SELECT count(*) FROM posts p" + whereStr
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM posts`).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("counting all posts: %w", err)
 	}
 
-	rows, err := r.pool.Query(ctx, `
+	query := fmt.Sprintf(`
 		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
 		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
 		       p.comment_count, p.like_count, p.created_at, p.updated_at
-		FROM posts p
+		FROM posts p%s
 		ORDER BY p.published_at DESC
-		LIMIT $1 OFFSET $2
-	`, params.Limit(), params.Offset())
+		LIMIT $%d OFFSET $%d
+	`, whereStr, len(args)+1, len(args)+2)
+
+	queryArgs := append(args, params.Limit(), params.Offset())
+	rows, err := r.pool.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("listing recent posts: %w", err)
 	}

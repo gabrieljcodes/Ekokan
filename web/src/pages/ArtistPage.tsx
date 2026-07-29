@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 export default function ArtistPage() {
   const { slug } = useParams<{ slug: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
-  const { user, isFavoriteArtist, toggleFavoriteArtist } = useAuth();
+  const { user, isFavoriteArtist, toggleFavoriteArtist, excludedTagIds } = useAuth();
   const favorited = artist ? (isFavoriteArtist(artist.id) || artist.is_favorited) : false;
   const [posts, setPosts] = useState<PaginatedResult<Post> | null>(null);
   const [page, setPage] = useState(1);
@@ -25,6 +25,12 @@ export default function ArtistPage() {
   const [taggingStatus, setTaggingStatus] = useState<string | null>(null);
   const [taggingLoading, setTaggingLoading] = useState(false);
 
+  // Non-persistent Tag Filtering State
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [filterIncludeTagIds, setFilterIncludeTagIds] = useState<Set<string>>(new Set());
+  const [filterExcludeTagIds, setFilterExcludeTagIds] = useState<Set<string>>(new Set());
+  const [filterTagSearch, setFilterTagSearch] = useState('');
+
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
@@ -36,16 +42,17 @@ export default function ArtistPage() {
 
   useEffect(() => {
     if (!slug) return;
-    api.listArtistPosts(slug, page, 25, search)
+    const combinedExcluded = Array.from(new Set([...Array.from(excludedTagIds || []), ...Array.from(filterExcludeTagIds)]));
+    api.listArtistPosts(slug, page, 25, search, Array.from(filterIncludeTagIds), combinedExcluded)
       .then(setPosts)
       .catch(console.error);
-  }, [slug, page, search]);
+  }, [slug, page, search, filterIncludeTagIds, filterExcludeTagIds, excludedTagIds]);
 
   useEffect(() => {
-    if (isMassTagging && availableTags.length === 0) {
+    if ((isMassTagging || isFiltering) && availableTags.length === 0) {
       api.listTags().then(setAvailableTags).catch(console.error);
     }
-  }, [isMassTagging, availableTags.length]);
+  }, [isMassTagging, isFiltering, availableTags.length]);
 
   const handleTogglePostSelect = (id: string) => {
     setSelectedPostIds((prev) => {
@@ -102,7 +109,8 @@ export default function ArtistPage() {
       await api.massTagPosts(Array.from(selectedPostIds), Array.from(selectedTagIds), action);
       setTaggingStatus(`Successfully ${action === 'add' ? 'applied' : 'removed'} tags on ${selectedPostIds.size} post(s)!`);
       if (slug) {
-        const res = await api.listArtistPosts(slug, page, 25, search);
+        const combinedExcluded = Array.from(new Set([...Array.from(excludedTagIds || []), ...Array.from(filterExcludeTagIds)]));
+        const res = await api.listArtistPosts(slug, page, 25, search, Array.from(filterIncludeTagIds), combinedExcluded);
         setPosts(res);
       }
       setTimeout(() => setTaggingStatus(null), 5000);
@@ -195,7 +203,48 @@ export default function ArtistPage() {
             <button
               type="button"
               onClick={() => {
+                setIsFiltering(!isFiltering);
+                if (!isFiltering) setIsMassTagging(false);
+              }}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '20px',
+                fontSize: 'var(--fs-sm)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                border: '1px solid',
+                borderColor: isFiltering ? '#a855f7' : 'var(--border-focus)',
+                background: isFiltering
+                  ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.15))'
+                  : 'var(--bg-elevated)',
+                color: isFiltering ? '#c084fc' : 'var(--text-primary)',
+                boxShadow: isFiltering ? '0 0 16px rgba(168, 85, 247, 0.25)' : 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+            >
+              <span>🎛️</span>
+              <span>{isFiltering ? 'Hide Tag Filters' : 'Filter by Tags'}</span>
+              {(filterIncludeTagIds.size + filterExcludeTagIds.size) > 0 && (
+                <span style={{
+                  background: '#a855f7',
+                  color: '#fff',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: 800
+                }}>
+                  {filterIncludeTagIds.size + filterExcludeTagIds.size}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setIsMassTagging(!isMassTagging);
+                if (!isMassTagging) setIsFiltering(false);
                 setTaggingStatus(null);
               }}
               style={{
@@ -237,6 +286,106 @@ export default function ArtistPage() {
             </Link>
           </div>
         </div>
+
+        {/* Non-persistent Tag Filtering Controls Banner */}
+        {isFiltering && (
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(30, 25, 45, 0.95), rgba(18, 15, 28, 0.95))',
+            border: '1px solid rgba(168, 85, 247, 0.35)',
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '28px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(12px)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🎛️ Non-Persistent Post Filter (Current Feed Only)
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Click a tag once to <strong style={{ color: '#34d399' }}>Include (+)</strong>, click twice to <strong style={{ color: '#fca5a5' }}>Exclude (-)</strong>, click a third time to clear.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {(filterIncludeTagIds.size > 0 || filterExcludeTagIds.size > 0) && (
+                  <button
+                    onClick={() => { setFilterIncludeTagIds(new Set()); setFilterExcludeTagIds(new Set()); setPage(1); }}
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Reset Filters ({filterIncludeTagIds.size + filterExcludeTagIds.size})
+                  </button>
+                )}
+                {excludedTagIds && excludedTagIds.size > 0 && (
+                  <span style={{ fontSize: '12px', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.25)', fontWeight: 600 }}>
+                    🛡️ +{excludedTagIds.size} persistent blacklist tag(s) active
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Tag Search in filter */}
+            <input
+              type="text"
+              value={filterTagSearch}
+              onChange={(e) => setFilterTagSearch(e.target.value)}
+              placeholder="🔍 Search available tags to include or exclude..."
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '14px', outline: 'none', marginBottom: '16px' }}
+            />
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '280px', overflowY: 'auto', padding: '2px' }}>
+              {availableTags
+                .filter(t => !filterTagSearch.trim() || t.name.toLowerCase().includes(filterTagSearch.toLowerCase()) || t.slug.includes(filterTagSearch.toLowerCase()))
+                .slice(0, 50)
+                .map(tag => {
+                  const isInc = filterIncludeTagIds.has(tag.id);
+                  const isExc = filterExcludeTagIds.has(tag.id);
+                  const isPersistExc = excludedTagIds?.has(tag.id);
+
+                  let bg = 'rgba(255,255,255,0.06)';
+                  let border = '1px solid rgba(255,255,255,0.12)';
+                  let color = '#fff';
+                  let prefix = '+';
+                  if (isPersistExc) {
+                    bg = 'rgba(185, 28, 28, 0.25)'; border = '1px dashed rgba(239, 68, 68, 0.4)'; color = '#fca5a5'; prefix = '🚫 (Blacklisted)';
+                  } else if (isInc) {
+                    bg = 'linear-gradient(135deg, #10b981, #059669)'; border = '1px solid #10b981'; prefix = '✓ INCLUDE';
+                  } else if (isExc) {
+                    bg = 'linear-gradient(135deg, #ef4444, #b91c1c)'; border = '1px solid #ef4444'; prefix = '✕ EXCLUDE';
+                  }
+
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        if (isPersistExc) return; // Managed in profile
+                        const newInc = new Set(filterIncludeTagIds);
+                        const newExc = new Set(filterExcludeTagIds);
+                        if (isInc) {
+                          newInc.delete(tag.id);
+                          newExc.add(tag.id);
+                        } else if (isExc) {
+                          newExc.delete(tag.id);
+                        } else {
+                          newInc.add(tag.id);
+                        }
+                        setFilterIncludeTagIds(newInc);
+                        setFilterExcludeTagIds(newExc);
+                        setPage(1);
+                      }}
+                      disabled={isPersistExc}
+                      title={isPersistExc ? 'This tag is persistently hidden via your user profile blacklist' : 'Click to toggle include/exclude'}
+                      style={{ background: bg, border, color, padding: '7px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: (isInc || isExc) ? 700 : 500, cursor: isPersistExc ? 'not-allowed' : 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '6px', opacity: isPersistExc ? 0.85 : 1 }}
+                    >
+                      <span style={{ fontSize: '11px', opacity: 0.85 }}>{prefix}</span>
+                      <span>#{tag.name}</span>
+                      <span style={{ opacity: 0.6, fontSize: '11px' }}>({tag.post_count})</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {/* Mass Tagging Controls Banner */}
         {isMassTagging && (
