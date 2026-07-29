@@ -57,7 +57,12 @@ func (h *PostHandler) ListByArtist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, perPage := parsePageParams(r)
-	result, err := h.posts.ListByArtist(r.Context(), artist.ID, models.PaginationParams{Page: page, PerPage: perPage})
+	search := r.URL.Query().Get("search")
+	if search == "" {
+		search = r.URL.Query().Get("q")
+	}
+
+	result, err := h.posts.ListByArtist(r.Context(), artist.ID, models.PaginationParams{Page: page, PerPage: perPage}, search)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

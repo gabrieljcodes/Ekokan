@@ -28,10 +28,10 @@ export default function ArtistPage() {
 
   useEffect(() => {
     if (!slug) return;
-    api.listArtistPosts(slug, page, 25)
+    api.listArtistPosts(slug, page, 25, search)
       .then(setPosts)
       .catch(console.error);
-  }, [slug, page]);
+  }, [slug, page, search]);
 
   if (loading) {
     return <div className="loading">Loading artist...</div>;
@@ -47,15 +47,6 @@ export default function ArtistPage() {
       </div>
     );
   }
-
-  const filteredPosts = search && posts
-    ? {
-        ...posts,
-        data: posts.data.filter(p =>
-          p.title.toLowerCase().includes(search.toLowerCase())
-        ),
-      }
-    : posts;
 
   return (
     <div>
@@ -132,7 +123,10 @@ export default function ArtistPage() {
                   className="search-bar__input"
                   placeholder="Search artist's posts..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
                 />
               </div>
               <Link to={`/posts/new?artist=${artist.slug}`} className="btn-primary">
@@ -141,10 +135,10 @@ export default function ArtistPage() {
             </div>
 
             {/* Posts grid */}
-            {filteredPosts && filteredPosts.data.length > 0 ? (
+            {posts && posts.data && posts.data.length > 0 ? (
               <>
                 <div className="post-grid">
-                  {filteredPosts.data.map((post) => (
+                  {posts.data.map((post) => (
                     <PostCard key={post.id} post={post} artistSlug={artist.slug} />
                   ))}
                 </div>

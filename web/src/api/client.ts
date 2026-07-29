@@ -71,9 +71,8 @@ export const api = {
   deleteArtist: (id: string) =>
     request<void>(`/api/artists/${id}`, { method: 'DELETE' }),
 
-  // Posts
-  listArtistPosts: (slug: string, page = 1, perPage = 25) =>
-    request<PaginatedResult<Post>>(`/api/artists/${slug}/posts?page=${page}&per_page=${perPage}`),
+  listArtistPosts: (slug: string, page = 1, perPage = 25, search = '') =>
+    request<PaginatedResult<Post>>(`/api/artists/${slug}/posts?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`),
 
   getPost: (id: string) =>
     request<Post>(`/api/posts/${id}`),

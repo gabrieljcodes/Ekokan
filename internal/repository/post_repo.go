@@ -23,23 +23,51 @@ func NewPostRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *PostRepo {
 	return &PostRepo{pool: pool, store: store}
 }
 
-func (r *PostRepo) ListByArtist(ctx context.Context, artistID uuid.UUID, params models.PaginationParams) (*models.PaginatedResult[models.Post], error) {
+func (r *PostRepo) ListByArtist(ctx context.Context, artistID uuid.UUID, params models.PaginationParams, search string) (*models.PaginatedResult[models.Post], error) {
 	var total int
-	if err := r.pool.QueryRow(ctx,
-		`SELECT count(*) FROM posts WHERE artist_id = $1`, artistID,
-	).Scan(&total); err != nil {
+	var countQuery string
+	var countArgs []any
+
+	if search != "" {
+		countQuery = `SELECT count(*) FROM posts WHERE artist_id = $1 AND (title ILIKE $2 OR content ILIKE $2)`
+		countArgs = []any{artistID, "%" + search + "%"}
+	} else {
+		countQuery = `SELECT count(*) FROM posts WHERE artist_id = $1`
+		countArgs = []any{artistID}
+	}
+
+	if err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("counting posts: %w", err)
 	}
 
-	rows, err := r.pool.Query(ctx, `
-		SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
-		       p.published_at, p.imported_at, p.media_count, p.attachment_count,
-		       p.comment_count, p.like_count, p.created_at, p.updated_at
-		FROM posts p
-		WHERE p.artist_id = $1
-		ORDER BY p.published_at DESC
-		LIMIT $2 OFFSET $3
-	`, artistID, params.Limit(), params.Offset())
+	var query string
+	var args []any
+
+	if search != "" {
+		query = `
+			SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
+			       p.published_at, p.imported_at, p.media_count, p.attachment_count,
+			       p.comment_count, p.like_count, p.created_at, p.updated_at
+			FROM posts p
+			WHERE p.artist_id = $1 AND (p.title ILIKE $2 OR p.content ILIKE $2)
+			ORDER BY p.published_at DESC
+			LIMIT $3 OFFSET $4
+		`
+		args = []any{artistID, "%" + search + "%", params.Limit(), params.Offset()}
+	} else {
+		query = `
+			SELECT p.id, p.artist_id, p.title, p.slug, p.content, p.source_url,
+			       p.published_at, p.imported_at, p.media_count, p.attachment_count,
+			       p.comment_count, p.like_count, p.created_at, p.updated_at
+			FROM posts p
+			WHERE p.artist_id = $1
+			ORDER BY p.published_at DESC
+			LIMIT $2 OFFSET $3
+		`
+		args = []any{artistID, params.Limit(), params.Offset()}
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing posts: %w", err)
 	}
