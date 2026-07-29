@@ -372,3 +372,34 @@ func (h *PostHandler) Recent(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, result)
 }
+
+type MassTagRequest struct {
+	PostIDs []uuid.UUID `json:"post_ids"`
+	TagIDs  []uuid.UUID `json:"tag_ids"`
+	Action  string      `json:"action"`
+}
+
+func (h *PostHandler) MassTag(w http.ResponseWriter, r *http.Request) {
+	var req MassTagRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if len(req.PostIDs) == 0 || len(req.TagIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "post_ids and tag_ids cannot be empty")
+		return
+	}
+	if req.Action == "" {
+		req.Action = "add"
+	}
+	if req.Action != "add" && req.Action != "remove" {
+		writeError(w, http.StatusBadRequest, "action must be 'add' or 'remove'")
+		return
+	}
+
+	if err := h.posts.MassTag(r.Context(), req.PostIDs, req.TagIDs, req.Action); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}

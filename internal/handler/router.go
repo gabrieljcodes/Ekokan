@@ -141,6 +141,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Post("/", postH.Create)
+				r.Post("/mass-tag", postH.MassTag)
 				r.Put("/{id}", postH.Update)
 				r.Delete("/{id}", postH.Delete)
 				r.Post("/{id}/favorite", favH.TogglePostFavorite)

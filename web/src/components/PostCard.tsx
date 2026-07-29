@@ -6,6 +6,9 @@ import { useAuth } from '../context/AuthContext';
 interface Props {
   post: Post;
   artistSlug: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -13,7 +16,7 @@ function formatDate(dateStr: string): string {
   return d.toISOString().replace('T', ' ').substring(0, 19);
 }
 
-export default function PostCard({ post, artistSlug }: Props) {
+export default function PostCard({ post, artistSlug, selectable = false, selected = false, onToggleSelect }: Props) {
   const thumb = post.media?.[0]?.file;
   const { user, isFavoritePost, toggleFavoritePost, isLikedPost, toggleLikePost } = useAuth();
   const favorited = isFavoritePost(post.id) || post.is_favorited;
@@ -49,12 +52,31 @@ export default function PostCard({ post, artistSlug }: Props) {
     }
   };
 
-  return (
-    <Link
-      to={`/artist/${artistSlug}/post/${post.id}`}
-      className="post-card"
-      style={{ textDecoration: 'none', position: 'relative' }}
-    >
+  const cardContent = (
+    <>
+      {selectable && (
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          zIndex: 4,
+          width: '28px',
+          height: '28px',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: selected ? 'linear-gradient(135deg, var(--accent), var(--success))' : 'rgba(18, 18, 18, 0.75)',
+          border: selected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.6)',
+          boxShadow: selected ? '0 0 12px rgba(106, 175, 230, 0.8)' : '0 2px 6px rgba(0,0,0,0.5)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          color: '#fff',
+          fontWeight: 800,
+          fontSize: '15px'
+        }}>
+          {selected ? '✓' : ''}
+        </div>
+      )}
       <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, display: 'flex', gap: '6px' }}>
         <button
           onClick={handleLike}
@@ -92,6 +114,40 @@ export default function PostCard({ post, artistSlug }: Props) {
           )}
         </div>
       </div>
+    </>
+  );
+
+  if (selectable) {
+    return (
+      <div
+        className="post-card"
+        style={{
+          cursor: 'pointer',
+          textDecoration: 'none',
+          position: 'relative',
+          outline: selected ? '3px solid var(--accent)' : 'none',
+          outlineOffset: '-3px',
+          transform: selected ? 'scale(0.98)' : 'none',
+          transition: 'all 0.2s ease',
+          userSelect: 'none'
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          onToggleSelect?.(post.id);
+        }}
+      >
+        {cardContent}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={`/artist/${artistSlug}/post/${post.id}`}
+      className="post-card"
+      style={{ textDecoration: 'none', position: 'relative' }}
+    >
+      {cardContent}
     </Link>
   );
 }

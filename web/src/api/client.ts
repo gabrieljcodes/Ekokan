@@ -92,6 +92,12 @@ export const api = {
   deletePost: (id: string) =>
     request<void>(`/api/posts/${id}`, { method: 'DELETE' }),
 
+  massTagPosts: (postIds: string[], tagIds: string[], action: 'add' | 'remove' = 'add') =>
+    request<{ status: string }>('/api/posts/mass-tag', {
+      method: 'POST',
+      body: JSON.stringify({ post_ids: postIds, tag_ids: tagIds, action }),
+    }),
+
   // Media
   uploadMedia: (postId: string, file: globalThis.File, caption = '') =>
     uploadFile<PostMedia>(`/api/posts/${postId}/media`, file, { caption }),

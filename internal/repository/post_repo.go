@@ -734,3 +734,31 @@ func (r *PostRepo) LoadArtistForPost(ctx context.Context, artistID uuid.UUID) (*
 	}
 	return &a, nil
 }
+
+// MassTag associates or dissociates a list of tags across multiple posts in a single atomic query
+func (r *PostRepo) MassTag(ctx context.Context, postIDs []uuid.UUID, tagIDs []uuid.UUID, action string) error {
+	if len(postIDs) == 0 || len(tagIDs) == 0 {
+		return nil
+	}
+	if action == "remove" {
+		_, err := r.pool.Exec(ctx, `
+			DELETE FROM post_tags
+			WHERE post_id = ANY($1::uuid[]) AND tag_id = ANY($2::uuid[])
+		`, postIDs, tagIDs)
+		if err != nil {
+			return fmt.Errorf("removing tags in bulk: %w", err)
+		}
+		return nil
+	}
+
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO post_tags (post_id, tag_id)
+		SELECT p.post_id, t.tag_id
+		FROM unnest($1::uuid[]) AS p(post_id), unnest($2::uuid[]) AS t(tag_id)
+		ON CONFLICT DO NOTHING
+	`, postIDs, tagIDs)
+	if err != nil {
+		return fmt.Errorf("adding tags in bulk: %w", err)
+	}
+	return nil
+}
