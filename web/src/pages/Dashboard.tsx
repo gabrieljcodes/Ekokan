@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist, PaginatedResult } from '../types/models';
 import ArtistCard from '../components/ArtistCard';
@@ -8,7 +8,20 @@ import Pagination from '../components/Pagination';
 export default function Dashboard() {
   const [result, setResult] = useState<PaginatedResult<Artist> | null>(null);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const setPage = (newPage: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (newPage > 1) {
+        next.set('page', newPage.toString());
+      } else {
+        next.delete('page');
+      }
+      return next;
+    });
+  };
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist, Post, PaginatedResult, Tag } from '../types/models';
 import PostCard from '../components/PostCard';
@@ -12,7 +12,20 @@ export default function ArtistPage() {
   const { user, isFavoriteArtist, toggleFavoriteArtist, excludedTagIds } = useAuth();
   const favorited = artist ? (isFavoriteArtist(artist.id) || artist.is_favorited) : false;
   const [posts, setPosts] = useState<PaginatedResult<Post> | null>(null);
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const setPage = (newPage: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (newPage > 1) {
+        next.set('page', newPage.toString());
+      } else {
+        next.delete('page');
+      }
+      return next;
+    });
+  };
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
