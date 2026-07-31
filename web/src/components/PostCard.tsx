@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Post } from '../types/models';
 import { useAuth } from '../context/AuthContext';
+import { toast } from './Toast';
+import { IconHeart, IconHeartFilled, IconStar, IconStarFilled, IconCheck, IconFilm } from './Icons';
 
 interface Props {
   post: Post;
@@ -27,7 +29,7 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      alert('Please login to bookmark posts');
+      toast('Please login to bookmark posts', 'info');
       return;
     }
     try {
@@ -41,7 +43,7 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      alert('Please login to like posts');
+      toast('Please login to like posts', 'info');
       return;
     }
     try {
@@ -55,44 +57,27 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
   const cardContent = (
     <>
       {selectable && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          zIndex: 4,
-          width: '28px',
-          height: '28px',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: selected ? 'linear-gradient(135deg, var(--accent), var(--success))' : 'rgba(18, 18, 18, 0.75)',
-          border: selected ? '2px solid #ffffff' : '2px solid rgba(255, 255, 255, 0.6)',
-          boxShadow: selected ? '0 0 12px rgba(106, 175, 230, 0.8)' : '0 2px 6px rgba(0,0,0,0.5)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-          color: '#fff',
-          fontWeight: 800,
-          fontSize: '15px'
-        }}>
-          {selected ? '✓' : ''}
+        <div className={`post-card__select ${selected ? 'post-card__select--active' : ''}`}>
+          {selected && <IconCheck size={14} />}
         </div>
       )}
-      <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2, display: 'flex', gap: '6px' }}>
+      <div className="post-card__actions">
         <button
           onClick={handleLike}
           className={`fav-btn ${liked ? 'fav-btn--active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}
-          title={liked ? 'Liked' : 'Like post'}
+          aria-label={liked ? 'Unlike post' : 'Like post'}
+          aria-pressed={liked}
         >
-          <span>{liked ? '❤️' : '🤍'}</span>
-          {likeCount > 0 && <span style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>{likeCount}</span>}
+          {liked ? <IconHeartFilled size={14} /> : <IconHeart size={14} />}
+          {likeCount > 0 && <span className="fav-btn__count">{likeCount}</span>}
         </button>
         <button
           onClick={handleFavorite}
           className={`fav-btn ${favorited ? 'fav-btn--active' : ''}`}
-          title={favorited ? 'Saved in favorites' : 'Add to favorites'}
+          aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          aria-pressed={favorited}
         >
-          {favorited ? '⭐' : '☆'}
+          {favorited ? <IconStarFilled size={14} /> : <IconStar size={14} />}
         </button>
       </div>
       {thumb?.url ? (
@@ -109,24 +94,8 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
             }}
           />
           {thumb.mime_type?.startsWith('video/') && (
-            <div style={{
-              position: 'absolute',
-              bottom: '60px',
-              left: '10px',
-              zIndex: 3,
-              background: 'rgba(18, 18, 24, 0.85)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              padding: '4px 10px',
-              color: 'var(--accent)',
-              fontSize: '11px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }}>
-              🎬 Video
+            <div className="post-card__video-badge">
+              <IconFilm size={12} /> Video
             </div>
           )}
         </>
@@ -148,17 +117,9 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
   if (selectable) {
     return (
       <div
-        className="post-card"
-        style={{
-          cursor: 'pointer',
-          textDecoration: 'none',
-          position: 'relative',
-          outline: selected ? '3px solid var(--accent)' : 'none',
-          outlineOffset: '-3px',
-          transform: selected ? 'scale(0.98)' : 'none',
-          transition: 'all 0.2s ease',
-          userSelect: 'none'
-        }}
+        className={`post-card ${selected ? 'post-card--selected' : ''}`}
+        role="option"
+        aria-selected={selected}
         onClick={(e) => {
           e.preventDefault();
           onToggleSelect?.(post.id);
@@ -173,10 +134,8 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
     <Link
       to={`/artist/${artistSlug}/post/${post.id}`}
       className="post-card"
-      style={{ textDecoration: 'none', position: 'relative' }}
     >
       {cardContent}
     </Link>
   );
 }
-

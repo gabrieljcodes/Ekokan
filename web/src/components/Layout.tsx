@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ToastContainer from './Toast';
 
 export default function Layout() {
   const { user, settings, logout } = useAuth();
@@ -161,6 +162,7 @@ export default function Layout() {
           Interactive API Documentation (Scalar / OpenAPI 3.0) ↗
         </a>
       </footer>
+      <ToastContainer />
     </>
   );
 }
