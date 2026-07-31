@@ -400,9 +400,12 @@ export default function EditPostPage() {
                   {existingMedia.map((m) => (
                     <div key={m.id} style={{ position: 'relative', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--bg-elevated)', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {m.file?.mime_type?.startsWith('video/') ? (
-                        <video src={m.file?.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                          <img src={m.file?.thumbnail_url || m.file?.url} alt="Video Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <span style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(0,0,0,0.8)', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', color: 'var(--accent)' }}>🎬 Video</span>
+                        </div>
                       ) : (
-                        <img src={m.file?.url} alt={m.caption} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={m.file?.thumbnail_url || m.file?.url} alt={m.caption} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       )}
                       <button
                         type="button"

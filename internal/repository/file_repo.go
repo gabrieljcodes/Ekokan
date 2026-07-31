@@ -38,6 +38,7 @@ func (r *FileRepo) FindBySHA256(ctx context.Context, sha256 string) (*models.Fil
 		return nil, fmt.Errorf("finding file by sha256: %w", err)
 	}
 	f.URL = r.store.PublicURL(f.FilePath)
+	f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 	return &f, nil
 }
 
@@ -58,6 +59,7 @@ func (r *FileRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.File, err
 		return nil, fmt.Errorf("finding file by id: %w", err)
 	}
 	f.URL = r.store.PublicURL(f.FilePath)
+	f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 	return &f, nil
 }
 
@@ -84,6 +86,7 @@ func (r *FileRepo) FindOrCreate(ctx context.Context, f *models.File) (existing b
 
 	if err == nil {
 		f.URL = r.store.PublicURL(f.FilePath)
+		f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 		return false, nil
 	}
 	if err != pgx.ErrNoRows {

@@ -96,12 +96,35 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
         </button>
       </div>
       {thumb?.url ? (
-        <img
-          src={thumb.url}
-          alt={post.title}
-          className="post-card__thumb"
-          loading="lazy"
-        />
+        <>
+          <img
+            src={thumb.thumbnail_url || thumb.url}
+            alt={post.title}
+            className="post-card__thumb"
+            loading="lazy"
+          />
+          {thumb.mime_type?.startsWith('video/') && (
+            <div style={{
+              position: 'absolute',
+              bottom: '60px',
+              left: '10px',
+              zIndex: 3,
+              background: 'rgba(18, 18, 24, 0.85)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+              padding: '4px 10px',
+              color: 'var(--accent)',
+              fontSize: '11px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              🎬 Video
+            </div>
+          )}
+        </>
       ) : (
         <div className="post-card__no-thumb">No media</div>
       )}

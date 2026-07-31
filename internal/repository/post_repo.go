@@ -495,6 +495,7 @@ func (r *PostRepo) loadFirstMediaBatch(ctx context.Context, postIDs []uuid.UUID)
 			return nil, err
 		}
 		f.URL = r.store.PublicURL(f.FilePath)
+		f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 		m.File = &f
 		res[m.PostID] = m
 	}
@@ -553,6 +554,7 @@ func (r *PostRepo) loadMedia(ctx context.Context, postID uuid.UUID) ([]models.Po
 			return nil, err
 		}
 		f.URL = r.store.PublicURL(f.FilePath)
+		f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 		m.File = &f
 		media = append(media, m)
 	}
@@ -583,6 +585,7 @@ func (r *PostRepo) loadFirstMedia(ctx context.Context, postID uuid.UUID) (*model
 		return nil, err
 	}
 	f.URL = r.store.PublicURL(f.FilePath)
+	f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 	m.File = &f
 	return &m, nil
 }
@@ -612,6 +615,7 @@ func (r *PostRepo) loadAttachments(ctx context.Context, postID uuid.UUID) ([]mod
 			return nil, err
 		}
 		f.URL = r.store.PublicURL(f.FilePath)
+		f.ThumbnailURL = r.store.PublicURL(f.FilePath + ".thumb.jpg")
 		a.File = &f
 		attachments = append(attachments, a)
 	}

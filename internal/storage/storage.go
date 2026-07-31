@@ -124,18 +124,40 @@ func (s *OpenDALStore) PublicURL(key string) string {
 }
 
 func (s *OpenDALStore) ServeFile(w http.ResponseWriter, r *http.Request, key string) {
+	if strings.HasSuffix(key, ".thumb.jpg") {
+		exists, err := s.Exists(r.Context(), key)
+		if err == nil && !exists {
+			origKey := strings.TrimSuffix(key, ".thumb.jpg")
+			if origBytes, origErr := s.Get(r.Context(), origKey); origErr == nil {
+				if thumbBytes, genErr := GenerateThumbnail(r.Context(), origBytes, filepath.Base(origKey)); genErr == nil {
+					_ = s.Put(r.Context(), key, thumbBytes)
+				}
+			}
+		}
+	}
+
 	if s.backend == "s3" {
 		http.Redirect(w, r, s.PublicURL(key), http.StatusFound)
-	} else {
-		data, err := s.Get(r.Context(), key)
-		if err != nil {
-			http.Error(w, "File not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(key)))
-		http.ServeContent(w, r, filepath.Base(key), time.Time{}, bytes.NewReader(data))
+		return
 	}
+
+	data, err := s.Get(r.Context(), key)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if strings.HasSuffix(key, ".thumb.jpg") || strings.HasPrefix(http.DetectContentType(data), "image/") || strings.HasPrefix(http.DetectContentType(data), "video/") {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filepath.Base(key)))
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(key)))
+	}
+	if strings.HasSuffix(key, ".thumb.jpg") {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+	}
+	http.ServeContent(w, r, filepath.Base(key), time.Time{}, bytes.NewReader(data))
 }
 
 // UploadResult holds the result of processing an uploaded file.
@@ -177,6 +199,9 @@ func ProcessUpload(ctx context.Context, store *OpenDALStore, filename string, re
 	if isNew {
 		if err := store.Put(ctx, storagePath, data); err != nil {
 			return nil, fmt.Errorf("storing file: %w", err)
+		}
+		if thumbBytes, err := GenerateThumbnail(ctx, data, filename); err == nil {
+			_ = store.Put(ctx, storagePath+".thumb.jpg", thumbBytes)
 		}
 	}
 

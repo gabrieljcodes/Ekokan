@@ -271,6 +271,7 @@ func (h *PostHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	// Attach file info
 	media.File = fileModel
 	media.File.URL = h.store.PublicURL(fileModel.FilePath)
+	media.File.ThumbnailURL = h.store.PublicURL(fileModel.FilePath + ".thumb.jpg")
 
 	writeJSON(w, http.StatusCreated, media)
 }
@@ -362,6 +363,7 @@ func (h *PostHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	att.File = fileModel
 	att.File.URL = h.store.PublicURL(fileModel.FilePath)
+	att.File.ThumbnailURL = h.store.PublicURL(fileModel.FilePath + ".thumb.jpg")
 
 	writeJSON(w, http.StatusCreated, att)
 }

@@ -20,7 +20,8 @@ type File struct {
 	StorageBackend string     `json:"storage_backend"`
 	RefCount       int        `json:"ref_count"`
 	CreatedAt      time.Time  `json:"created_at"`
-	URL            string     `json:"url,omitempty"` // computed, not stored
+	URL            string     `json:"url,omitempty"`           // computed, not stored
+	ThumbnailURL   string     `json:"thumbnail_url,omitempty"` // computed, not stored
 }
 
 type User struct {

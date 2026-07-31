@@ -119,6 +119,7 @@ export default function MediaViewer({ media }: Props) {
                   controls
                   preload="metadata"
                   playsInline
+                  poster={file.thumbnail_url || file.url}
                 >
                   <source src={file.url} type={file.mime_type} />
                   Your browser does not support video playback.

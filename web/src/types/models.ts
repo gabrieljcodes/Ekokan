@@ -13,6 +13,7 @@ export interface File {
   ref_count: number;
   created_at: string;
   url?: string;
+  thumbnail_url?: string;
 }
 
 export interface Artist {
