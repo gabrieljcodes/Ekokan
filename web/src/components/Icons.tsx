@@ -150,3 +150,8 @@ export function IconBolt(props: IconProps = {}) {
   return svg(props, 'M13 2L3 14h9l-1 8 10-12h-9l1-8z');
 }
 
+export function IconChevronDown(props: IconProps = {}) {
+  return svg(props, 'M6 9l6 6 6-6');
+}
+
+
