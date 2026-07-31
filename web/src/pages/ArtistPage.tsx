@@ -32,6 +32,7 @@ export default function ArtistPage() {
     });
   };
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   // Mass Tagging State
@@ -60,10 +61,12 @@ export default function ArtistPage() {
 
   useEffect(() => {
     if (!slug) return;
+    setPostsLoading(true);
     const combinedExcluded = Array.from(new Set([...Array.from(excludedTagIds || []), ...Array.from(filterExcludeTagIds)]));
     api.listArtistPosts(slug, page, 25, search, Array.from(filterIncludeTagIds), combinedExcluded)
       .then(setPosts)
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setPostsLoading(false));
   }, [slug, page, search, filterIncludeTagIds, filterExcludeTagIds, excludedTagIds]);
 
   useEffect(() => {
@@ -285,7 +288,9 @@ export default function ArtistPage() {
         )}
 
         {/* Posts Grid */}
-        {posts && posts.data && posts.data.length > 0 ? (
+        {postsLoading || !posts ? (
+          <div className="loading">Loading art works…</div>
+        ) : posts && posts.data && posts.data.length > 0 ? (
           <>
             <h2 className="visually-hidden">Posts</h2>
             <div className="post-grid">
