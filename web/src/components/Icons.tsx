@@ -125,3 +125,28 @@ export function IconTag(props: IconProps = {}) {
 export function IconArrowLeft(props: IconProps = {}) {
   return svg(props, 'M19 12H5', 'M12 19l-7-7 7-7');
 }
+
+export function IconShield(props: IconProps = {}) {
+  return svg(props, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z');
+}
+
+export function IconSliders(props: IconProps = {}) {
+  return svg(props, 'M4 21v-7', 'M4 10V3', 'M12 21v-9', 'M12 8V3', 'M20 21v-5', 'M20 12V3', 'M1 14h6', 'M9 8h6', 'M17 16h6');
+}
+
+export function IconUsers(props: IconProps = {}) {
+  return svg(props, 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M23 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75');
+}
+
+export function IconUser(props: IconProps = {}) {
+  return svg(props, 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z');
+}
+
+export function IconRefresh(props: IconProps = {}) {
+  return svg(props, 'M23 4v6h-6', 'M20.49 15a9 9 0 1 1-2.12-9.36L23 10');
+}
+
+export function IconBolt(props: IconProps = {}) {
+  return svg(props, 'M13 2L3 14h9l-1 8 10-12h-9l1-8z');
+}
+

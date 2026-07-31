@@ -3,6 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import type { User, AppSettings } from '../types/models';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '../components/Toast';
+import {
+  IconShield,
+  IconSliders,
+  IconUsers,
+  IconUser,
+  IconRefresh,
+  IconBolt,
+  IconCheck,
+  IconX,
+} from '../components/Icons';
 
 export default function AdminSettingsPage() {
   const { user, settings, refreshSettings } = useAuth();
@@ -11,8 +22,7 @@ export default function AdminSettingsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmRoleChange, setConfirmRoleChange] = useState<{ username: string; newRole: string } | null>(null);
 
   const [localSettings, setLocalSettings] = useState<AppSettings>({
     allow_user_artist_creation: true,
@@ -37,7 +47,7 @@ export default function AdminSettingsPage() {
       const res = await api.listUsers();
       setUsers(res.data);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error loading users list');
+      toast(err.message || 'Error loading users list', 'error');
     } finally {
       setLoadingUsers(false);
     }
@@ -49,8 +59,6 @@ export default function AdminSettingsPage() {
 
   const handleToggleSetting = async (key: keyof AppSettings) => {
     setSavingSettings(true);
-    setStatusMsg(null);
-    setErrorMsg(null);
 
     const updated = {
       ...localSettings,
@@ -62,188 +70,222 @@ export default function AdminSettingsPage() {
       const saved = await api.updateSettings(updated);
       setLocalSettings(saved);
       await refreshSettings();
-      setStatusMsg('✅ System permissions updated successfully!');
+      toast('System permissions updated successfully!', 'success');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update settings');
+      toast(err.message || 'Failed to update settings', 'error');
     } finally {
       setSavingSettings(false);
     }
   };
 
-  const handleRoleChange = async (targetUser: User, newRole: string) => {
-    if (!window.confirm(`Are you sure you want to change role of "${targetUser.username}" to ${newRole.toUpperCase()}?`)) {
-      return;
-    }
-    setStatusMsg(null);
-    setErrorMsg(null);
+  const executeRoleChange = async (targetUser: User, newRole: string) => {
+    setConfirmRoleChange(null);
     try {
       await api.setUserRole(targetUser.username, newRole);
-      setUsers(prev => prev.map(u => u.username === targetUser.username ? { ...u, role: newRole } : u));
-      setStatusMsg(`✅ User ${targetUser.username} role updated to ${newRole}!`);
+      setUsers((prev) =>
+        prev.map((u) => (u.username === targetUser.username ? { ...u, role: newRole } : u)),
+      );
+      toast(`User ${targetUser.username} role updated to ${newRole.toUpperCase()}`, 'success');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to alter user role');
+      toast(err.message || 'Failed to alter user role', 'error');
     }
   };
 
   return (
-    <div className="container" style={{ maxWidth: '900px', margin: '32px auto' }}>
-      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-        <h1 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', color: '#646cff' }}>
-          🛡️ Admin Controls & Permissions
+    <div className="admin-container">
+      <main className="admin-card">
+        <h1 className="admin-header__title">
+          <IconShield size={26} /> Admin Controls & Permissions
         </h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+        <p className="admin-header__subtitle">
           Configure system creation permissions for standard users and manage administrative access across Ekokan.
         </p>
 
-        {statusMsg && (
-          <div style={{ background: 'rgba(76, 175, 80, 0.15)', border: '1px solid #4caf50', color: '#4caf50', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontWeight: '600' }}>
-            {statusMsg}
-          </div>
-        )}
-        {errorMsg && (
-          <div style={{ background: 'rgba(244, 67, 54, 0.15)', border: '1px solid #f44336', color: '#f44336', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontWeight: '600' }}>
-            ❌ {errorMsg}
-          </div>
-        )}
-
         {/* Section 1: Creation Permissions */}
-        <div style={{ marginBottom: '40px', borderBottom: '1px solid var(--border-color)', paddingBottom: '32px' }}>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '16px' }}>
-            🛠️ Global Creation Permissions
+        <section className="admin-section">
+          <h2 className="admin-section__title">
+            <IconSliders size={20} /> Global Creation Permissions
           </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-primary)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div>
-                <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '4px' }}>Allow Common Users to Create Artist Profiles</strong>
-                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+          <div className="admin-settings-list">
+            <div className="admin-setting-item">
+              <div className="admin-setting-item__text" id="setting-artist-desc">
+                <strong className="admin-setting-item__label">
+                  Allow Common Users to Create Artist Profiles
+                </strong>
+                <span className="admin-setting-item__desc">
                   If disabled, only administrators can add new artists via UI or importers.
                 </span>
               </div>
               <button
                 type="button"
+                role="switch"
+                aria-checked={localSettings.allow_user_artist_creation}
+                aria-labelledby="setting-artist-desc"
                 onClick={() => handleToggleSetting('allow_user_artist_creation')}
                 disabled={savingSettings}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: '20px',
-                  border: 'none',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  backgroundColor: localSettings.allow_user_artist_creation ? '#4caf50' : '#f44336',
-                  color: '#fff',
-                  minWidth: '110px',
-                  transition: 'all 0.2s',
-                }}
+                className={`admin-toggle-btn ${
+                  localSettings.allow_user_artist_creation
+                    ? 'admin-toggle-btn--enabled'
+                    : 'admin-toggle-btn--disabled'
+                }`}
               >
-                {localSettings.allow_user_artist_creation ? 'ENABLED' : 'DISABLED'}
+                {localSettings.allow_user_artist_creation ? (
+                  <>
+                    <IconCheck size={16} /> ENABLED
+                  </>
+                ) : (
+                  <>
+                    <IconX size={16} /> DISABLED
+                  </>
+                )}
               </button>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-primary)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div>
-                <strong style={{ display: 'block', fontSize: '1.05rem', marginBottom: '4px' }}>Allow Common Users to Create Posts & Upload Media</strong>
-                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            <div className="admin-setting-item">
+              <div className="admin-setting-item__text" id="setting-post-desc">
+                <strong className="admin-setting-item__label">
+                  Allow Common Users to Create Posts & Upload Media
+                </strong>
+                <span className="admin-setting-item__desc">
                   If disabled, ordinary registered users will be restricted to viewing and favoriting only.
                 </span>
               </div>
               <button
                 type="button"
+                role="switch"
+                aria-checked={localSettings.allow_user_post_creation}
+                aria-labelledby="setting-post-desc"
                 onClick={() => handleToggleSetting('allow_user_post_creation')}
                 disabled={savingSettings}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: '20px',
-                  border: 'none',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  backgroundColor: localSettings.allow_user_post_creation ? '#4caf50' : '#f44336',
-                  color: '#fff',
-                  minWidth: '110px',
-                  transition: 'all 0.2s',
-                }}
+                className={`admin-toggle-btn ${
+                  localSettings.allow_user_post_creation
+                    ? 'admin-toggle-btn--enabled'
+                    : 'admin-toggle-btn--disabled'
+                }`}
               >
-                {localSettings.allow_user_post_creation ? 'ENABLED' : 'DISABLED'}
+                {localSettings.allow_user_post_creation ? (
+                  <>
+                    <IconCheck size={16} /> ENABLED
+                  </>
+                ) : (
+                  <>
+                    <IconX size={16} /> DISABLED
+                  </>
+                )}
               </button>
             </div>
-
           </div>
-        </div>
+        </section>
 
         {/* Section 2: Users List */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '700' }}>
-              👥 Registered Users & Role Management
+        <section className="admin-section">
+          <div className="admin-section__header">
+            <h2 className="admin-section__title">
+              <IconUsers size={20} /> Registered Users & Role Management
             </h2>
             <button
               type="button"
               onClick={fetchUsers}
-              className="app-header__btn app-header__btn--secondary"
+              className="btn-secondary"
               disabled={loadingUsers}
-              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+              aria-label="Refresh registered users list"
             >
-              🔄 Refresh List
+              <IconRefresh size={14} className={loadingUsers ? 'admin-icon--spinning' : ''} /> Refresh List
             </button>
           </div>
-          
-          <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: 'var(--bg-primary)' }}>
+
+          <div className="admin-table-container">
+            <table className="admin-table">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.03)' }}>
-                  <th style={{ padding: '12px 16px', fontWeight: '700' }}>Username</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '700' }}>Display Name</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '700' }}>Current Role</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '700', textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th scope="col">Username</th>
+                  <th scope="col">Display Name</th>
+                  <th scope="col">Current Role</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 && !loadingUsers ? (
+                {loadingUsers && users.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      No users found.
+                    <td colSpan={4} className="admin-table__empty">
+                      Loading registered users...
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="admin-table__empty">
+                      No users found in archive database.
                     </td>
                   </tr>
                 ) : (
-                  users.map(u => {
+                  users.map((u) => {
                     const isAdm = u.role === 'admin' || u.role === 'administrator';
                     const isSelf = u.id === user?.id;
+                    const isConfirming = confirmRoleChange?.username === u.username;
+
                     return (
-                      <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: '600' }}>{u.username}</td>
-                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{u.display_name || '—'}</td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            fontSize: '0.8rem',
-                            fontWeight: '700',
-                            backgroundColor: isAdm ? 'rgba(100, 108, 255, 0.2)' : 'rgba(255,255,255,0.08)',
-                            color: isAdm ? '#646cff' : 'inherit',
-                            border: isAdm ? '1px solid #646cff' : '1px solid var(--border-color)'
-                          }}>
-                            {isAdm ? '⚡ ADMIN' : '👤 USER'}
+                      <tr key={u.id}>
+                        <td>
+                          <strong>{u.username}</strong>
+                        </td>
+                        <td>{u.display_name || '—'}</td>
+                        <td>
+                          <span
+                            className={`admin-table__user-role ${
+                              isAdm
+                                ? 'admin-table__user-role--admin'
+                                : 'admin-table__user-role--user'
+                            }`}
+                          >
+                            {isAdm ? (
+                              <>
+                                <IconBolt size={14} /> ADMIN
+                              </>
+                            ) : (
+                              <>
+                                <IconUser size={14} /> USER
+                              </>
+                            )}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <td>
                           {isSelf ? (
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            <span className="admin-table__self-tag">
                               (You)
                             </span>
+                          ) : isConfirming ? (
+                            <div className="admin-confirm-box" role="alert" aria-live="polite">
+                              <span className="admin-confirm-text">
+                                Confirm {confirmRoleChange.newRole.toUpperCase()}?
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => executeRoleChange(u, confirmRoleChange.newRole)}
+                                className="btn-primary"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmRoleChange(null)}
+                                className="btn-secondary"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           ) : isAdm ? (
                             <button
-                              onClick={() => handleRoleChange(u, 'user')}
-                              className="app-header__btn"
-                              style={{ border: '1px solid #f44336', color: '#f44336', padding: '4px 10px', fontSize: '0.8rem', cursor: 'pointer', background: 'transparent', borderRadius: '6px' }}
+                              type="button"
+                              onClick={() => setConfirmRoleChange({ username: u.username, newRole: 'user' })}
+                              className="admin-action-btn admin-action-btn--demote"
                             >
                               Demote to User
                             </button>
                           ) : (
                             <button
-                              onClick={() => handleRoleChange(u, 'admin')}
-                              className="app-header__btn"
-                              style={{ border: '1px solid #4caf50', color: '#4caf50', padding: '4px 10px', fontSize: '0.8rem', cursor: 'pointer', background: 'transparent', borderRadius: '6px' }}
+                              type="button"
+                              onClick={() => setConfirmRoleChange({ username: u.username, newRole: 'admin' })}
+                              className="admin-action-btn admin-action-btn--promote"
                             >
                               Promote to Admin
                             </button>
@@ -256,10 +298,9 @@ export default function AdminSettingsPage() {
               </tbody>
             </table>
           </div>
-
-        </div>
-
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
+

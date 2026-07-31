@@ -9,7 +9,7 @@ import { toast } from '../components/Toast';
 import ArtistProfileHeader from '../components/ArtistProfileHeader';
 import TagFilterPanel from '../components/TagFilterPanel';
 import MassTagPanel from '../components/MassTagPanel';
-import { IconSearch, IconFilter, IconTag, IconPlus, IconUpload } from '../components/Icons';
+import { IconSearch, IconFilter, IconTag, IconPlus, IconUpload, IconArrowLeft } from '../components/Icons';
 
 export default function ArtistPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -181,7 +181,11 @@ export default function ArtistPage() {
   };
 
   if (loading) {
-    return <div className="loading">Loading artist…</div>;
+    return (
+      <div className="loading" role="status" aria-live="polite">
+        Loading artist…
+      </div>
+    );
   }
 
   if (!artist) {
@@ -189,7 +193,7 @@ export default function ArtistPage() {
       <div className="app-container">
         <div className="empty-state">Artist not found</div>
         <Link to="/" className="artist-back-link">
-          ← Back to artists
+          <IconArrowLeft size={14} /> Back to artists
         </Link>
       </div>
     );
@@ -289,7 +293,9 @@ export default function ArtistPage() {
 
         {/* Posts Grid */}
         {postsLoading || !posts ? (
-          <div className="loading">Loading art works…</div>
+          <div className="loading" role="status" aria-live="polite">
+            Loading art works…
+          </div>
         ) : posts && posts.data && posts.data.length > 0 ? (
           <>
             <h2 className="visually-hidden">Posts</h2>
