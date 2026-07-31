@@ -154,4 +154,16 @@ export function IconChevronDown(props: IconProps = {}) {
   return svg(props, 'M6 9l6 6 6-6');
 }
 
+export function IconTrash(props: IconProps = {}) {
+  return svg(props, 'M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+}
+
+export function IconImage(props: IconProps = {}) {
+  return svg(props, 'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z', 'M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z', 'M21 15l-5-5L5 21');
+}
+
+export function IconWarning(props: IconProps = {}) {
+  return svg(props, 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', 'M12 9v4', 'M12 17h.01');
+}
+
 

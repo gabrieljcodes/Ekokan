@@ -1,7 +1,18 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist } from '../types/models';
+import {
+  IconEdit,
+  IconTrash,
+  IconWarning,
+  IconImage,
+  IconRefresh,
+  IconCheck,
+  IconArrowLeft,
+  IconPlus,
+  IconX,
+} from '../components/Icons';
 
 export default function EditArtistPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -14,6 +25,9 @@ export default function EditArtistPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const [fetching, setFetching] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -43,15 +57,42 @@ export default function EditArtistPage() {
       .finally(() => setFetching(false));
   }, [slug]);
 
-  const avatarPreview = useMemo(() => {
-    if (!avatarFile) return null;
-    return URL.createObjectURL(avatarFile);
+  // Securely manage Object URLs without DOM memory leaks
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatarFile);
+    setAvatarPreview(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [avatarFile]);
 
-  const bannerPreview = useMemo(() => {
-    if (!bannerFile) return null;
-    return URL.createObjectURL(bannerFile);
+  useEffect(() => {
+    if (!bannerFile) {
+      setBannerPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(bannerFile);
+    setBannerPreview(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [bannerFile]);
+
+  // Keyboard trap and escape handler for accessibility in dialog modal
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        setShowDeleteModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDeleteModal, loading]);
 
   const addLinkField = () => {
     setLinks([...links, { label: '', url: '' }]);
@@ -128,32 +169,43 @@ export default function EditArtistPage() {
   };
 
   if (fetching) {
-    return <div className="loading">Loading artist settings...</div>;
+    return (
+      <div className="loading" role="status" aria-live="polite">
+        <IconRefresh size={22} className="admin-icon--spinning" />
+        <span>Loading artist settings...</span>
+      </div>
+    );
   }
 
   if (!artist) {
     return (
       <div className="app-container">
-        <div className="empty-state">Artist not found</div>
-        <Link to="/" style={{ display: 'block', textAlign: 'center', marginTop: '1rem' }}>
-          ← Return to Artist Directory
-        </Link>
+        <div className="empty-state" role="alert">Artist not found</div>
+        <div className="empty-state__actions">
+          <Link to="/" className="edit-artist__return-link">
+            <IconArrowLeft size={16} /> Return to Artist Directory
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="app-container">
-      <div className="breadcrumb">
-        <Link to="/">Artists</Link> &nbsp;/&nbsp;
-        <Link to={`/artist/${artist.slug}`}>{artist.name}</Link> &nbsp;/&nbsp;
-        <span>Edit Artist Profile</span>
-      </div>
+      <nav aria-label="Breadcrumb" className="breadcrumb">
+        <Link to="/">Artists</Link>
+        <span className="breadcrumb__sep" aria-hidden="true">/</span>
+        <Link to={`/artist/${artist.slug}`}>{artist.name}</Link>
+        <span className="breadcrumb__sep" aria-hidden="true">/</span>
+        <span aria-current="page">Edit Artist Profile</span>
+      </nav>
 
       <div className="form-card">
-        <div className="form-card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="form-card__header form-card__header--split">
           <div>
-            <h1 className="form-card__title">✏️ Edit Artist: {artist.name}</h1>
+            <h1 className="form-card__title">
+              <IconEdit size={22} /> Edit Artist: {artist.name}
+            </h1>
             <p className="form-card__subtitle">
               Modify artist profile details, biography, links, avatar, and banner.
             </p>
@@ -161,22 +213,27 @@ export default function EditArtistPage() {
           <button
             type="button"
             onClick={() => setShowDeleteModal(true)}
-            className="btn-danger"
-            style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold' }}
+            className="btn-danger edit-artist__delete-btn"
             disabled={loading}
           >
-            🗑️ Delete Creator
+            <IconTrash size={16} /> Delete Creator
           </button>
         </div>
 
-        {error && <div className="form-error">⚠️ {error}</div>}
+        {error && (
+          <div className="form-error motion-arrive-card" role="alert">
+            <IconWarning size={18} /> {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">
-              Artist Name <span style={{ color: 'var(--danger)' }}>*</span>
+            <label className="form-label" htmlFor="artist-name">
+              <span>Artist Name</span>
+              <span className="edit-artist__required-mark">*</span>
             </label>
             <input
+              id="artist-name"
               type="text"
               placeholder="e.g. Mika Pikazo"
               value={name}
@@ -188,24 +245,30 @@ export default function EditArtistPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">
-              URL Slug <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)' }}>(Read Only)</span>
+            <label className="form-label" htmlFor="artist-slug-readonly">
+              <span>URL Slug</span>
+              <span className="edit-artist__readonly-hint">(Read Only)</span>
             </label>
             <input
+              id="artist-slug-readonly"
               type="text"
               value={artist.slug}
-              disabled={true}
-              style={{ backgroundColor: 'var(--bg-secondary)', cursor: 'not-allowed', color: 'var(--text-muted)' }}
+              readOnly={true}
+              aria-readonly="true"
+              className="edit-artist__readonly-input"
             />
-            <span className="form-helper">The unique gallery URL slug (/artist/<strong>{artist.slug}</strong>) cannot be modified after initial creation to protect existing hyperlinks.</span>
+            <span className="form-helper">
+              The unique gallery URL slug (/artist/<strong>{artist.slug}</strong>) cannot be modified after initial creation to protect existing hyperlinks.
+            </span>
           </div>
 
           <div className="form-group">
-            <label className="form-label">
-              Biography / Notes
+            <label className="form-label" htmlFor="artist-bio">
+              <span>Biography / Notes</span>
               <span className="form-label__hint">Optional</span>
             </label>
             <textarea
+              id="artist-bio"
               rows={4}
               placeholder="Overview, artist style descriptions, or personal archiving notes..."
               value={bio}
@@ -216,35 +279,39 @@ export default function EditArtistPage() {
 
           {/* Avatar Upload */}
           <div className="form-group">
-            <label className="form-label">
-              Avatar Image
+            <label className="form-label" htmlFor="avatar-upload-input">
+              <span>Avatar Image</span>
               <span className="form-label__hint">Leave blank to keep current avatar</span>
             </label>
             {artist.avatar_url && !avatarPreview && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <img src={artist.avatar_url} alt="Current Avatar" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} />
+              <div className="edit-artist__current-card">
+                <img src={artist.avatar_url} alt="" className="edit-artist__current-avatar" />
                 <div>
-                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>Current Avatar Active</div>
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>Upload below to replace this image</div>
+                  <div className="edit-artist__current-title">Current Avatar Active</div>
+                  <div className="edit-artist__current-subtitle">Upload below to replace this image</div>
                 </div>
               </div>
             )}
             {!avatarPreview ? (
               <div className="dropzone">
                 <input
+                  id="avatar-upload-input"
                   type="file"
                   accept="image/*"
                   className="dropzone__input"
+                  aria-label="Upload new artist avatar image"
                   onChange={(e) => e.target.files?.[0] && setAvatarFile(e.target.files[0])}
                   disabled={loading}
                 />
-                <div className="dropzone__icon">🖼️</div>
+                <div className="dropzone__icon">
+                  <IconImage size={28} />
+                </div>
                 <div className="dropzone__text">Click or drag an image here to upload new avatar</div>
                 <div className="dropzone__subtext">PNG, JPG, WebP supported</div>
               </div>
             ) : (
-              <div className="file-preview-item">
-                <img src={avatarPreview} alt="Avatar preview" className="file-preview-item__thumb" />
+              <div className="file-preview-item motion-arrive-card">
+                <img src={avatarPreview} alt="" className="file-preview-item__thumb" />
                 <div className="file-preview-item__info">
                   <div className="file-preview-item__name">{avatarFile?.name}</div>
                   <div className="file-preview-item__size">
@@ -253,11 +320,11 @@ export default function EditArtistPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="btn-danger edit-artist__delete-btn"
                   onClick={() => setAvatarFile(null)}
                   disabled={loading}
                 >
-                  Cancel Replacement
+                  <IconX size={14} /> Cancel Replacement
                 </button>
               </div>
             )}
@@ -265,38 +332,41 @@ export default function EditArtistPage() {
 
           {/* Banner Upload */}
           <div className="form-group">
-            <label className="form-label">
-              Profile Banner Image
+            <label className="form-label" htmlFor="banner-upload-input">
+              <span>Profile Banner Image</span>
               <span className="form-label__hint">Leave blank to keep current cover</span>
             </label>
             {artist.banner_url && !bannerPreview && (
-              <div style={{ marginBottom: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-                <img src={artist.banner_url} alt="Current Banner" style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }} />
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 12px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#fff', fontSize: 'var(--fs-sm)', fontWeight: 500 }}>
-                  Current Cover Banner
+              <div className="edit-artist__banner-container">
+                <img src={artist.banner_url} alt="" className="edit-artist__current-banner" />
+                <div className="edit-artist__banner-badge">
+                  Current Cover Banner Active
                 </div>
               </div>
             )}
             {!bannerPreview ? (
               <div className="dropzone">
                 <input
+                  id="banner-upload-input"
                   type="file"
                   accept="image/*"
                   className="dropzone__input"
+                  aria-label="Upload new profile cover banner"
                   onChange={(e) => e.target.files?.[0] && setBannerFile(e.target.files[0])}
                   disabled={loading}
                 />
-                <div className="dropzone__icon">🌄</div>
+                <div className="dropzone__icon">
+                  <IconImage size={28} />
+                </div>
                 <div className="dropzone__text">Click or drag an image here to replace cover banner</div>
                 <div className="dropzone__subtext">Large widescreen animations or artworks work best</div>
               </div>
             ) : (
-              <div className="file-preview-item">
+              <div className="file-preview-item motion-arrive-card">
                 <img
                   src={bannerPreview}
-                  alt="Banner preview"
-                  className="file-preview-item__thumb"
-                  style={{ width: '140px', height: '48px', objectFit: 'cover' }}
+                  alt=""
+                  className="file-preview-item__thumb edit-artist__banner-preview-thumb"
                 />
                 <div className="file-preview-item__info">
                   <div className="file-preview-item__name">{bannerFile?.name}</div>
@@ -306,11 +376,11 @@ export default function EditArtistPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="btn-danger edit-artist__delete-btn"
                   onClick={() => setBannerFile(null)}
                   disabled={loading}
                 >
-                  Cancel Replacement
+                  <IconX size={14} /> Cancel Replacement
                 </button>
               </div>
             )}
@@ -319,62 +389,77 @@ export default function EditArtistPage() {
           {/* External Links */}
           <div className="form-group">
             <label className="form-label">External Links</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+            <div className="edit-artist__links-stack">
               {links.map((link, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                <div key={idx} className="edit-artist__link-row motion-arrive-row">
                   <input
                     type="text"
                     placeholder="Platform (e.g. Patreon, Pixiv, Twitter)"
+                    aria-label={`Link platform name for row ${idx + 1}`}
                     value={link.label}
                     onChange={(e) => updateLink(idx, 'label', e.target.value)}
-                    style={{ width: '180px' }}
+                    className="edit-artist__link-label"
                     disabled={loading}
                   />
                   <input
                     type="url"
                     placeholder="https://..."
+                    aria-label={`Link web URL for row ${idx + 1}`}
                     value={link.url}
                     onChange={(e) => updateLink(idx, 'url', e.target.value)}
-                    style={{ flex: 1 }}
+                    className="edit-artist__link-url"
                     disabled={loading}
                   />
                   <button
                     type="button"
                     className="btn-danger"
+                    aria-label={`Remove link row ${idx + 1}`}
                     onClick={() => removeLink(idx)}
                     disabled={loading}
                   >
-                    ✕
+                    <IconX size={16} />
                   </button>
                 </div>
               ))}
             </div>
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-secondary edit-artist__add-link-btn"
               onClick={addLinkField}
-              style={{ alignSelf: 'flex-start', marginTop: 'var(--space-sm)' }}
               disabled={loading}
             >
-              + Add Another Link
+              <IconPlus size={16} /> Add Another Link
             </button>
           </div>
 
           {loading && (
-            <div className="progress-box">
-              <div className="progress-box__title">⏳ {statusText || 'Saving changes...'}</div>
+            <div className="progress-box" role="status" aria-live="polite">
+              <div className="progress-box__title">
+                <IconRefresh size={16} className="admin-icon--spinning" />
+                <span>{statusText || 'Saving changes...'}</span>
+              </div>
               <div className="progress-bar">
-                <div className="progress-bar__fill" style={{ width: '100%', animation: 'pulse 1.5s infinite' }} />
+                <div className="progress-bar__fill" />
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-md)', marginTop: 'var(--space-xl)' }}>
-            <Link to={`/artist/${artist.slug}`} className="btn-secondary" style={{ padding: 'var(--space-sm) var(--space-lg)', textDecoration: 'none' }}>
-              Cancel
+          <div className="edit-artist__form-actions">
+            <Link to={`/artist/${artist.slug}`} className="btn-secondary edit-artist__action-btn">
+              <IconArrowLeft size={16} /> Cancel
             </Link>
-            <button type="submit" className="btn-primary" disabled={loading} style={{ padding: 'var(--space-sm) var(--space-lg)' }}>
-              {loading ? 'Saving...' : '✓ Save Artist Changes'}
+            <button type="submit" className="btn-primary edit-artist__action-btn" disabled={loading}>
+              {loading ? (
+                <>
+                  <IconRefresh size={16} className="admin-icon--spinning" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <IconCheck size={16} />
+                  <span>Save Artist Changes</span>
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -382,27 +467,24 @@ export default function EditArtistPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-            borderRadius: '16px', padding: '28px', maxWidth: '440px', width: '100%',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', color: 'var(--danger)', fontSize: '1.4rem' }}>⚠️ Delete Artist?</h3>
-            <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', lineHeight: '1.6', fontSize: 'var(--fs-sm)' }}>
+        <div className="modal-overlay" role="presentation">
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-artist-title"
+          >
+            <h3 id="delete-artist-title" className="modal-card__title">
+              <IconWarning size={22} /> Delete Artist?
+            </h3>
+            <p className="modal-card__description">
               Are you sure you want to completely delete <strong>{artist.name}</strong> and all associated posts, attachments, and files? <strong>This action is permanent and cannot be undone.</strong>
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div className="modal-card__actions">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="btn-secondary"
-                style={{ padding: '8px 18px', borderRadius: '8px' }}
+                className="btn-secondary modal-card__btn"
                 disabled={loading}
               >
                 Keep Creator
@@ -410,11 +492,10 @@ export default function EditArtistPage() {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="btn-danger"
-                style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: 'bold' }}
+                className="btn-danger modal-card__btn"
                 disabled={loading}
               >
-                Yes, Permanently Delete
+                <IconTrash size={16} /> Yes, Permanently Delete
               </button>
             </div>
           </div>

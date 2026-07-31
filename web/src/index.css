@@ -1058,6 +1058,8 @@ input:focus, textarea:focus, select:focus {
 .loading {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: var(--space-sm);
   padding: var(--space-2xl);
   color: var(--text-muted);
   font-size: var(--fs-sm);
@@ -1068,6 +1070,11 @@ input:focus, textarea:focus, select:focus {
   padding: var(--space-2xl);
   color: var(--text-muted);
   font-size: var(--fs-sm);
+}
+.empty-state__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-sm);
 }
 
 .section-title {
@@ -1081,12 +1088,24 @@ input:focus, textarea:focus, select:focus {
   font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.breadcrumb__sep {
+  color: var(--text-muted);
+  opacity: 0.7;
+  user-select: none;
 }
 .breadcrumb a {
   color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
 }
 .breadcrumb a:hover {
   color: var(--accent);
+  text-decoration: underline;
 }
 
 /* ==================== Responsive ==================== */
@@ -1185,8 +1204,35 @@ input:focus, textarea:focus, select:focus {
   }
   .app-footer {
     flex-direction: column;
-    text-align: center;
     padding: var(--space-lg) var(--space-md);
+  }
+  .form-card__header--split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-artist__delete-btn {
+    justify-content: center;
+  }
+  .edit-artist__link-row {
+    flex-wrap: wrap;
+  }
+  .edit-artist__link-label {
+    width: 100%;
+  }
+  .edit-artist__form-actions {
+    flex-direction: column-reverse;
+  }
+  .edit-artist__action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .modal-card__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .modal-card__btn {
+    justify-content: center;
+    width: 100%;
   }
 }
 
@@ -1291,19 +1337,32 @@ input:focus, textarea:focus, select:focus {
   text-align: center;
   background: var(--bg-elevated);
   cursor: pointer;
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition: border-color var(--transition-base), background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
   position: relative;
+  overflow: hidden;
 }
 
-.dropzone:hover, .dropzone--active {
+.dropzone:hover, .dropzone--active, .dropzone:focus-within {
   border-color: var(--accent);
   background: var(--bg-card-hover);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dropzone:active:not(:disabled) {
+  transform: scale(0.99);
 }
 
 .dropzone__icon {
   font-size: var(--fs-2xl);
   margin-bottom: var(--space-sm);
   color: var(--text-secondary);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms ease;
+}
+
+.dropzone:hover .dropzone__icon,
+.dropzone:focus-within .dropzone__icon {
+  transform: scale(1.1) translateY(-2px);
+  color: var(--accent);
 }
 
 .dropzone__text {
@@ -1345,6 +1404,37 @@ input:focus, textarea:focus, select:focus {
   padding: var(--space-sm);
 }
 
+/* Impeccable motion tokens for dynamic field entrances & button feedback */
+.motion-arrive-card {
+  animation: motion-arrive-slide 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.motion-arrive-row {
+  animation: motion-arrive-slide 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes motion-arrive-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.edit-artist__delete-btn,
+.edit-artist__add-link-btn,
+.edit-artist__action-btn {
+  transition: transform 120ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+.edit-artist__delete-btn:active:not(:disabled),
+.edit-artist__add-link-btn:active:not(:disabled),
+.edit-artist__action-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
 .file-preview-item__thumb {
   width: 56px;
   height: 56px;
@@ -1371,6 +1461,241 @@ input:focus, textarea:focus, select:focus {
 .file-preview-item__size {
   font-size: var(--fs-xs);
   color: var(--text-muted);
+}
+
+/* ==================== Edit Artist Page & Form Token Classes ==================== */
+
+.form-card__header--split {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.edit-artist__delete-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-artist__required-mark {
+  color: var(--danger);
+}
+
+.edit-artist__readonly-hint {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+
+.edit-artist__readonly-input {
+  background-color: var(--bg-secondary);
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.edit-artist__current-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.edit-artist__current-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  flex-shrink: 0;
+}
+
+.edit-artist__current-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.edit-artist__current-subtitle {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.edit-artist__banner-container {
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.edit-artist__current-banner {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-artist__banner-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.edit-artist__banner-preview-thumb {
+  width: 140px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.edit-artist__links-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.edit-artist__link-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  width: 100%;
+}
+
+.edit-artist__link-label {
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.edit-artist__link-url {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-artist__add-link-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-artist__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.edit-artist__action-btn {
+  padding: var(--space-sm) var(--space-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.edit-artist__return-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-md);
+  text-decoration: none;
+  color: var(--accent);
+}
+.edit-artist__return-link:hover {
+  text-decoration: underline;
+}
+
+/* ==================== Modal Abstraction ==================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: var(--space-md);
+  animation: modal-overlay-fade 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modal-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: modal-card-arrive 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modal-card-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-card__title {
+  margin: 0 0 12px 0;
+  color: var(--danger);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-card__description {
+  margin: 0 0 20px 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: var(--fs-sm);
+}
+
+.modal-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modal-card__btn {
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Buttons */
@@ -1507,11 +1832,15 @@ input:focus, textarea:focus, select:focus {
   border-radius: var(--radius-sm);
   padding: var(--space-md);
   margin-top: var(--space-lg);
+  animation: motion-arrive-slide 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .progress-box__title {
   font-size: var(--fs-sm);
   font-weight: 600;
   margin-bottom: var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .progress-bar {
   width: 100%;
@@ -1519,11 +1848,19 @@ input:focus, textarea:focus, select:focus {
   background: var(--bg-input);
   border-radius: 4px;
   overflow: hidden;
+  position: relative;
 }
 .progress-bar__fill {
+  width: 100%;
   height: 100%;
-  background: var(--accent);
-  transition: width 300ms ease;
+  background: linear-gradient(90deg, var(--bg-input) 0%, var(--accent) 50%, var(--bg-input) 100%);
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.4s infinite linear;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Tag Selector in Form */
@@ -2361,8 +2698,14 @@ input:focus, textarea:focus, select:focus {
   .admin-icon--spinning,
   .post-grid,
   .tag-panel,
-  .user-dropdown__menu {
-    animation: none;
+  .user-dropdown__menu,
+  .modal-overlay,
+  .modal-card,
+  .motion-arrive-card,
+  .motion-arrive-row,
+  .progress-box,
+  .progress-bar__fill {
+    animation: none !important;
   }
   .admin-toggle-btn,
   .admin-action-btn,
@@ -2372,8 +2715,13 @@ input:focus, textarea:focus, select:focus {
   .artist-action-bar__buttons a,
   .app-header__btn,
   .user-menu-btn,
-  .user-menu__chevron {
-    transition: none;
+  .user-menu__chevron,
+  .dropzone,
+  .dropzone__icon,
+  .edit-artist__delete-btn,
+  .edit-artist__add-link-btn,
+  .edit-artist__action-btn {
+    transition: none !important;
   }
   .admin-toggle-btn:active:not(:disabled),
   .admin-action-btn:active:not(:disabled),
@@ -2383,8 +2731,14 @@ input:focus, textarea:focus, select:focus {
   .artist-action-bar__buttons a:active:not(:disabled),
   .app-header__btn:active:not(:disabled),
   .user-menu-btn:active:not(:disabled),
-  .user-menu-btn[aria-expanded="true"] .user-menu__chevron {
-    transform: none;
+  .user-menu-btn[aria-expanded="true"] .user-menu__chevron,
+  .dropzone:active:not(:disabled),
+  .dropzone:hover .dropzone__icon,
+  .dropzone:focus-within .dropzone__icon,
+  .edit-artist__delete-btn:active:not(:disabled),
+  .edit-artist__add-link-btn:active:not(:disabled),
+  .edit-artist__action-btn:active:not(:disabled) {
+    transform: none !important;
   }
 }
 
