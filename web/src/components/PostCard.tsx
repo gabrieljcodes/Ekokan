@@ -102,6 +102,11 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
             alt={post.title}
             className="post-card__thumb"
             loading="lazy"
+            onError={(e) => {
+              if (thumb.url && e.currentTarget.src !== thumb.url) {
+                e.currentTarget.src = thumb.url;
+              }
+            }}
           />
           {thumb.mime_type?.startsWith('video/') && (
             <div style={{

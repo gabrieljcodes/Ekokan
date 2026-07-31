@@ -69,6 +69,9 @@ func main() {
 	settingsRepo := repository.NewSettingsRepo(pool)
 	apiTokenRepo := repository.NewApiTokenRepo(pool)
 
+	// Background worker: Scan and generate missing thumbnails in storage/CDN automatically
+	go repository.StartThumbnailWorker(pool, store)
+
 	// CLI Console Commands
 	if len(os.Args) >= 3 && (strings.EqualFold(os.Args[1], "make-admin") || strings.EqualFold(os.Args[1], "promote") || strings.EqualFold(os.Args[1], "admin") || strings.EqualFold(os.Args[1], "-make-admin")) {
 		username := os.Args[2]
