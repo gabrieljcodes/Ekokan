@@ -25,17 +25,32 @@ func GenerateThumbnail(ctx context.Context, data []byte, filename string) ([]byt
 	ext := strings.ToLower(filepath.Ext(filename))
 
 	// Determine if file is a known video format
-	isVideo := isVideoExtension(ext)
-
-	// Try native Go image decoding first if it's not explicitly a video
-	if !isVideo {
-		if thumb, err := generateImageThumbnail(data); err == nil {
-			return thumb, nil
-		}
+	if isVideoExtension(ext) {
+		return generateVideoThumbnail(ctx, data)
 	}
 
-	// Fall back to ffmpeg for videos or images that failed native decoding
+	if thumb, err := generateImageThumbnail(data); err == nil {
+		return thumb, nil
+	}
+
+	// Avoid invoking ffmpeg on archive, audio, document, or project files
+	if isUnsupportedThumbnailExtension(ext) {
+		return nil, fmt.Errorf("thumbnail generation not supported for file extension: %s", ext)
+	}
+
+	// Fall back to ffmpeg for other potential media formats
 	return generateVideoThumbnail(ctx, data)
+}
+
+func isUnsupportedThumbnailExtension(ext string) bool {
+	switch ext {
+	case ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".exe", ".bin",
+		".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md",
+		".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma",
+		".psd", ".clip", ".ai", ".cs", ".py", ".cpp", ".c", ".go", ".js", ".html", ".css", ".json", ".xml", ".yaml", ".yml":
+		return true
+	}
+	return false
 }
 
 func isVideoExtension(ext string) bool {

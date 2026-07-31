@@ -20,7 +20,7 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 	slog.Info("thumbnail background worker started: scanning database to generate missing media thumbnails")
 	ctx := context.Background()
 
-	rows, err := pool.Query(ctx, "SELECT file_path, original_name FROM files ORDER BY created_at DESC")
+	rows, err := pool.Query(ctx, "SELECT file_path, original_name FROM files WHERE mime_type LIKE 'image/%%' OR mime_type LIKE 'video/%%' ORDER BY created_at DESC")
 	if err != nil {
 		slog.Error("thumbnail worker: failed to query files from database", "error", err)
 		return
