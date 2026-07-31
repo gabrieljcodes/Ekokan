@@ -1,7 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Post, Tag, PostMedia, PostAttachment } from '../types/models';
+import {
+  IconEdit,
+  IconTrash,
+  IconWarning,
+  IconRefresh,
+  IconCheck,
+  IconPlus,
+  IconX,
+  IconArrowLeft,
+  IconFilm,
+  IconPackage,
+  IconFileText,
+  IconSave
+} from '../components/Icons';
 
 interface NewMediaItem {
   file: File;
@@ -61,11 +75,51 @@ export default function EditPostPage() {
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Declarative Modals & Alert state
+  const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+  const [mediaToDelete, setMediaToDelete] = useState<string | null>(null);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  const newMediaItemsRef = useRef<NewMediaItem[]>([]);
+  newMediaItemsRef.current = newMediaItems;
+
+  // Cleanup Blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      newMediaItemsRef.current.forEach((item) => {
+        if (item.preview.startsWith('blob:')) {
+          URL.revokeObjectURL(item.preview);
+        }
+      });
+    };
+  }, []);
+
+  // Keyboard accessibility for modals
+  const closeModal = useCallback(() => {
+    setShowDeletePostModal(false);
+    setMediaToDelete(null);
+    setAttachmentToDelete(null);
+    setAlertMessage(null);
+  }, []);
+
+  useEffect(() => {
+    const isAnyModalOpen = showDeletePostModal || mediaToDelete !== null || attachmentToDelete !== null || alertMessage !== null;
+    if (!isAnyModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDeletePostModal, mediaToDelete, attachmentToDelete, alertMessage, closeModal]);
+
   useEffect(() => {
     if (!postId) return;
     setLoading(true);
 
-    // Fetch Post and Tags
     Promise.all([
       api.getPost(postId),
       api.listTags()
@@ -112,13 +166,12 @@ export default function EditPostPage() {
       setSelectedTagIds([...selectedTagIds, created.id]);
       setNewTagName('');
     } catch (err: any) {
-      alert(err.message || 'Failed to create tag');
+      setAlertMessage(err.message || 'Failed to create tag');
     } finally {
       setTagCreating(false);
     }
   };
 
-  // New Media Handlers
   const handleAddNewMedia = (files: FileList | null) => {
     if (!files) return;
     const items: NewMediaItem[] = Array.from(files).map((file) => ({
@@ -131,22 +184,25 @@ export default function EditPostPage() {
 
   const removeNewMedia = (index: number) => {
     const next = [...newMediaItems];
-    URL.revokeObjectURL(next[index].preview);
+    if (next[index]?.preview.startsWith('blob:')) {
+      URL.revokeObjectURL(next[index].preview);
+    }
     next.splice(index, 1);
     setNewMediaItems(next);
   };
 
-  const handleDeleteExistingMedia = async (mediaId: string) => {
-    if (!postId || !window.confirm('Are you sure you want to delete this media file from the post?')) return;
+  const confirmDeleteExistingMedia = async () => {
+    if (!postId || !mediaToDelete) return;
     try {
-      await api.removeMedia(postId, mediaId);
-      setExistingMedia((prev) => prev.filter((m) => m.id !== mediaId));
+      await api.removeMedia(postId, mediaToDelete);
+      setExistingMedia((prev) => prev.filter((m) => m.id !== mediaToDelete));
+      setMediaToDelete(null);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete media');
+      setMediaToDelete(null);
+      setAlertMessage(err.message || 'Failed to delete media');
     }
   };
 
-  // New Attachment Handlers
   const handleAddNewAttachments = (files: FileList | null) => {
     if (!files) return;
     const items: NewAttachmentItem[] = Array.from(files).map((file) => ({
@@ -160,24 +216,28 @@ export default function EditPostPage() {
     setNewAttachmentItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleDeleteExistingAttachment = async (attId: string) => {
-    if (!postId || !window.confirm('Are you sure you want to delete this attachment from the post?')) return;
+  const confirmDeleteExistingAttachment = async () => {
+    if (!postId || !attachmentToDelete) return;
     try {
-      await api.removeAttachment(postId, attId);
-      setExistingAttachments((prev) => prev.filter((a) => a.id !== attId));
+      await api.removeAttachment(postId, attachmentToDelete);
+      setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentToDelete));
+      setAttachmentToDelete(null);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete attachment');
+      setAttachmentToDelete(null);
+      setAlertMessage(err.message || 'Failed to delete attachment');
     }
   };
 
-  const handleDeletePost = async () => {
-    if (!postId || !window.confirm('WARNING: Are you sure you want to permanently delete this entire post and all associated files?')) return;
+  const executeDeletePost = async () => {
+    if (!postId) return;
     setSaving(true);
     try {
       await api.deletePost(postId);
+      setShowDeletePostModal(false);
       navigate(artistSlug ? `/artist/${artistSlug}` : '/');
     } catch (err: any) {
-      alert(err.message || 'Failed to delete post');
+      setShowDeletePostModal(false);
+      setAlertMessage(err.message || 'Failed to delete post');
       setSaving(false);
     }
   };
@@ -207,19 +267,17 @@ export default function EditPostPage() {
       const totalNewFiles = newMediaItems.length + newAttachmentItems.length;
       let completedFiles = 0;
 
-      // Upload newly added artwork
       for (let i = 0; i < newMediaItems.length; i++) {
         const item = newMediaItems[i];
-        setStatusText(`Uploading new artwork ${i + 1} of ${newMediaItems.length}: ${item.file.name}...`);
+        setStatusText(`Uploading artwork ${i + 1} of ${newMediaItems.length}: ${item.file.name}...`);
         await api.uploadMedia(postId, item.file, item.caption.trim());
         completedFiles++;
         setProgressPercent(15 + Math.round((completedFiles / Math.max(1, totalNewFiles)) * 80));
       }
 
-      // Upload newly added attachments
       for (let i = 0; i < newAttachmentItems.length; i++) {
         const item = newAttachmentItems[i];
-        setStatusText(`Uploading new archive ${i + 1} of ${newAttachmentItems.length}: ${item.file.name}...`);
+        setStatusText(`Uploading archive ${i + 1} of ${newAttachmentItems.length}: ${item.file.name}...`);
         await api.uploadAttachment(postId, item.file, item.displayName.trim());
         completedFiles++;
         setProgressPercent(15 + Math.round((completedFiles / Math.max(1, totalNewFiles)) * 80));
@@ -237,41 +295,75 @@ export default function EditPostPage() {
   };
 
   if (loading) {
-    return <div className="app-container"><div className="loading-spinner">Loading post data...</div></div>;
+    return (
+      <div className="app-container">
+        <div className="loading" role="status" aria-live="polite">
+          <IconRefresh className="admin-icon--spinning" />
+          <span>Loading post data...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!post) {
-    return <div className="app-container"><div className="error-message">Post not found.</div></div>;
+    return (
+      <div className="app-container">
+        <div className="empty-state">
+          <IconWarning size={32} />
+          <h3>Post not found</h3>
+          <p>The post you are trying to edit does not exist or has been deleted.</p>
+          <Link to="/" className="btn-secondary">
+            <IconArrowLeft />
+            <span>Return to Gallery</span>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="app-container">
-      <div className="breadcrumb">
-        <Link to="/">Gallery</Link> &nbsp;/&nbsp;
-        {artistSlug && <><Link to={`/artist/${artistSlug}`}>Artist</Link> &nbsp;/&nbsp;</>}
-        <Link to={`/artist/${artistSlug}/post/${post.id}`}>{post.title}</Link> &nbsp;/&nbsp;
-        <span>Edit Post</span>
-      </div>
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/">Gallery</Link>
+        <span className="breadcrumb-separator" aria-hidden="true">/</span>
+        {artistSlug && (
+          <>
+            <Link to={`/artist/${artistSlug}`}>Artist</Link>
+            <span className="breadcrumb-separator" aria-hidden="true">/</span>
+          </>
+        )}
+        <Link to={`/artist/${artistSlug}/post/${post.id}`}>{post.title}</Link>
+        <span className="breadcrumb-separator" aria-hidden="true">/</span>
+        <span aria-current="page">Edit Post</span>
+      </nav>
 
-      <div className="form-card" style={{ maxWidth: '850px' }}>
-        <div className="form-card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 className="form-card__title">✏️ Edit Post</h2>
-            <p className="form-card__subtitle">Modify post details, assign tags, or manage uploaded media and attachments.</p>
+      <div className="form-card edit-post-card motion-arrive-card">
+        <div className="form-card__header edit-post__header">
+          <div className="edit-post__header-text">
+            <h2 className="form-card__title">
+              <IconEdit size={22} />
+              <span>Edit Post</span>
+            </h2>
+            <p className="form-card__subtitle">Modify post details, assign tags, or manage uploaded artwork and attachments.</p>
           </div>
           <button
             type="button"
-            onClick={handleDeletePost}
-            className="btn-danger"
-            style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => setShowDeletePostModal(true)}
+            className="btn-danger edit-post__delete-btn"
             disabled={saving}
           >
-            🗑️ Delete Post
+            <IconTrash size={16} />
+            <span>Delete Post</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="form-card__body">
-          {error && <div className="error-message" style={{ marginBottom: '1rem', padding: '12px', background: 'rgba(239,68,68,0.15)', border: '1px solid #f87171', color: '#fca5a5', borderRadius: 'var(--radius-sm)' }}>{error}</div>}
+          {error && (
+            <div className="form-error" role="alert">
+              <IconWarning size={18} />
+              <span>{error}</span>
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="edit-title">Post Title *</label>
@@ -290,8 +382,7 @@ export default function EditPostPage() {
             <label htmlFor="edit-content">Content / Description</label>
             <textarea
               id="edit-content"
-              className="form-input"
-              style={{ minHeight: '130px', resize: 'vertical', fontFamily: 'inherit' }}
+              className="form-input form-textarea"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               disabled={saving}
@@ -299,7 +390,6 @@ export default function EditPostPage() {
             />
           </div>
 
-          {/* Published At Date / Time */}
           <div className="form-group">
             <label htmlFor="edit-published-at" className="form-label">
               Published Date & Time
@@ -307,25 +397,25 @@ export default function EditPostPage() {
             <input
               id="edit-published-at"
               type="datetime-local"
+              className="form-input"
               value={publishedAt}
               onChange={(e) => setPublishedAt(e.target.value)}
               disabled={saving}
-              style={{ colorScheme: 'dark', width: '100%' }}
             />
             <span className="form-helper">
-              Change the historical publication date of this post.
+              Change the historical publication timestamp of this post.
             </span>
           </div>
 
-          <hr style={{ borderColor: 'var(--border-color)', margin: 'var(--space-lg) 0' }} />
+          <hr className="edit-post__divider" />
 
           {/* Tags Section */}
           <div className="form-group">
-            <label>Tags</label>
-            <p className="text-muted" style={{ fontSize: 'var(--fs-xs)', marginBottom: '8px' }}>
+            <label id="tags-group-label">Tags</label>
+            <span className="edit-post__section-desc">
               Click tags to attach or detach them from this post.
-            </p>
-            <div className="tag-picker">
+            </span>
+            <div className="edit-post__tag-picker" role="region" aria-labelledby="tags-group-label">
               {availableTags.map((tag) => {
                 const isSelected = selectedTagIds.includes(tag.id);
                 return (
@@ -333,39 +423,37 @@ export default function EditPostPage() {
                     key={tag.id}
                     type="button"
                     onClick={() => toggleTag(tag.id)}
-                    className={`tag-picker__badge tag-picker__badge--${tag.category} ${isSelected ? 'tag-picker__badge--selected' : ''}`}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '16px',
-                      border: '1px solid var(--border-color)',
-                      margin: '3px',
-                      cursor: 'pointer',
-                      background: isSelected ? 'var(--accent)' : 'var(--bg-elevated)',
-                      color: isSelected ? '#fff' : 'var(--text-secondary)',
-                      fontWeight: isSelected ? 600 : 400
-                    }}
+                    aria-pressed={isSelected}
+                    className={`edit-post__tag-badge tag-picker__badge--${tag.category} ${isSelected ? 'edit-post__tag-badge--selected' : ''}`}
                   >
-                    {tag.name} {isSelected && '✓'}
+                    <span>{tag.name}</span>
+                    {isSelected && (
+                      <span className="edit-post__tag-check-animate">
+                        <IconCheck size={14} />
+                      </span>
+                    )}
                   </button>
                 );
               })}
-              {availableTags.length === 0 && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>No tags available. Create one below!</span>}
+              {availableTags.length === 0 && (
+                <span className="text-muted">No tags available. Create one below!</span>
+              )}
             </div>
 
             {/* Quick tag creation */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', background: 'var(--bg-primary)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+            <div className="edit-post__tag-create-box">
               <input
                 type="text"
                 placeholder="New tag name..."
-                className="form-input"
-                style={{ flex: 1, margin: 0, padding: '6px 12px' }}
+                className="form-input edit-post__tag-input"
+                aria-label="New tag name"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 disabled={saving || tagCreating}
               />
               <select
-                className="form-input"
-                style={{ width: '130px', margin: 0, padding: '6px 10px' }}
+                className="form-input edit-post__tag-select"
+                aria-label="New tag category"
                 value={newTagCategory}
                 onChange={(e) => setNewTagCategory(e.target.value)}
                 disabled={saving || tagCreating}
@@ -379,44 +467,58 @@ export default function EditPostPage() {
               <button
                 type="button"
                 onClick={handleQuickCreateTag}
-                className="btn-secondary"
-                style={{ padding: '6px 14px', whiteSpace: 'nowrap' }}
+                className="btn-secondary edit-post__tag-create-btn"
                 disabled={saving || tagCreating || !newTagName.trim()}
               >
-                {tagCreating ? '...' : '+ Create Tag'}
+                {tagCreating ? <IconRefresh className="admin-icon--spinning" size={16} /> : <IconPlus size={16} />}
+                <span>{tagCreating ? 'Creating...' : 'Create Tag'}</span>
               </button>
             </div>
           </div>
 
-          <hr style={{ borderColor: 'var(--border-color)', margin: 'var(--space-lg) 0' }} />
+          <hr className="edit-post__divider" />
 
-          {/* Existing & New Media Section */}
+          {/* Manage Media Section */}
           <div className="form-group">
-            <label>Manage Artwork / Media</label>
+            <label id="artwork-group-label">Manage Artwork / Media</label>
             {existingMedia.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Existing Artwork ({existingMedia.length}):</span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+              <div className="motion-arrive-row">
+                <span className="edit-post__section-desc">Existing Artwork ({existingMedia.length}):</span>
+                <div className="edit-post__media-grid" role="region" aria-labelledby="artwork-group-label">
                   {existingMedia.map((m) => (
-                    <div key={m.id} style={{ position: 'relative', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--bg-elevated)', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div key={m.id} className="edit-post__media-card">
                       {m.file?.mime_type?.startsWith('video/') ? (
-                        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                          <img src={m.file?.thumbnail_url || m.file?.url} alt="Video Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { if (m.file?.url && e.currentTarget.src !== m.file.url) e.currentTarget.src = m.file.url; }} />
-                          <span style={{ position: 'absolute', bottom: '4px', left: '4px', background: 'rgba(0,0,0,0.8)', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', color: 'var(--accent)' }}>🎬 Video</span>
+                        <div className="edit-post__media-thumb-wrap">
+                          <img
+                            src={m.file?.thumbnail_url || m.file?.url}
+                            alt="Video Thumbnail"
+                            className="edit-post__media-thumb"
+                            onError={(e) => { if (m.file?.url && e.currentTarget.src !== m.file.url) e.currentTarget.src = m.file.url; }}
+                          />
+                          <span className="edit-post__video-badge">
+                            <IconFilm size={12} />
+                            <span>Video</span>
+                          </span>
                         </div>
                       ) : (
-                        <img src={m.file?.thumbnail_url || m.file?.url} alt={m.caption} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { if (m.file?.url && e.currentTarget.src !== m.file.url) e.currentTarget.src = m.file.url; }} />
+                        <img
+                          src={m.file?.thumbnail_url || m.file?.url}
+                          alt={m.caption || 'Artwork file'}
+                          className="edit-post__media-thumb"
+                          onError={(e) => { if (m.file?.url && e.currentTarget.src !== m.file.url) e.currentTarget.src = m.file.url; }}
+                        />
                       )}
                       <button
                         type="button"
-                        onClick={() => handleDeleteExistingMedia(m.id)}
-                        style={{ position: 'absolute', top: '6px', right: '6px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                        onClick={() => setMediaToDelete(m.id)}
+                        className="edit-post__remove-media-btn"
+                        aria-label={`Remove existing artwork ${m.caption || m.file?.original_name || ''}`}
                         title="Remove artwork"
                       >
-                        ×
+                        <IconX size={18} />
                       </button>
                       {m.caption && (
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.7)', padding: '2px 6px', fontSize: '11px', color: '#fff', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        <div className="edit-post__media-caption-bar">
                           {m.caption}
                         </div>
                       )}
@@ -426,37 +528,39 @@ export default function EditPostPage() {
               </div>
             )}
 
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Add More Artwork / Media:</span>
+            <label htmlFor="upload-more-artwork" className="edit-post__section-desc">Add More Artwork / Media:</label>
             <input
+              id="upload-more-artwork"
               type="file"
               multiple
               accept="image/*,video/*"
               onChange={(e) => { handleAddNewMedia(e.target.files); e.target.value = ''; }}
               disabled={saving}
-              className="form-input"
-              style={{ padding: '8px', background: 'var(--bg-primary)' }}
+              className="form-input edit-post__file-upload"
             />
             {newMediaItems.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginTop: '12px' }}>
+              <div className="edit-post__media-grid motion-arrive-row">
                 {newMediaItems.map((item, idx) => (
-                  <div key={idx} style={{ position: 'relative', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--bg-elevated)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ aspectRatio: '1', position: 'relative', overflow: 'hidden', borderRadius: '4px' }}>
+                  <div key={idx} className="edit-post__media-card edit-post__media-card--new">
+                    <div className="edit-post__media-thumb-wrap">
                       {item.file.type.startsWith('video/') ? (
-                        <video src={item.preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <video src={item.preview} className="edit-post__media-thumb" />
                       ) : (
-                        <img src={item.preview} alt={item.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={item.preview} alt={item.file.name} className="edit-post__media-thumb" />
                       )}
                       <button
                         type="button"
                         onClick={() => removeNewMedia(idx)}
-                        style={{ position: 'absolute', top: '4px', right: '4px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer' }}
+                        className="edit-post__remove-media-btn"
+                        aria-label={`Remove new file ${item.file.name}`}
                       >
-                        ×
+                        <IconX size={18} />
                       </button>
                     </div>
                     <input
                       type="text"
                       placeholder="Caption..."
+                      aria-label={`Caption for new artwork ${item.file.name}`}
                       value={item.caption}
                       onChange={(e) => {
                         const next = [...newMediaItems];
@@ -464,61 +568,72 @@ export default function EditPostPage() {
                         setNewMediaItems(next);
                       }}
                       disabled={saving}
-                      className="form-input"
-                      style={{ padding: '4px 8px', fontSize: '12px', margin: 0 }}
+                      className="form-input edit-post__media-caption-input"
                     />
                   </div>
                 ))}
               </div>
             )}
+            {existingMedia.length === 0 && newMediaItems.length === 0 && (
+              <p className="form-helper">
+                No artwork currently assigned. Upload high-resolution illustrations or videos above.
+              </p>
+            )}
           </div>
 
-          <hr style={{ borderColor: 'var(--border-color)', margin: 'var(--space-lg) 0' }} />
+          <hr className="edit-post__divider" />
 
-          {/* Existing & New Attachments Section */}
+          {/* Manage Attachments Section */}
           <div className="form-group">
-            <label>Manage Downloadable Attachments</label>
+            <label id="attachments-group-label">Manage Downloadable Attachments</label>
             {existingAttachments.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Existing Attachments ({existingAttachments.length}):</span>
-                <ul className="attachment-list">
+              <div className="motion-arrive-row">
+                <span className="edit-post__section-desc">Existing Attachments ({existingAttachments.length}):</span>
+                <div role="region" aria-labelledby="attachments-group-label">
                   {existingAttachments.map((a) => (
-                    <li key={a.id} className="attachment-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span className="attachment-item__icon">📦 </span>
-                        <span className="attachment-item__name" style={{ fontWeight: 500 }}>{a.display_name || a.file?.original_name}</span>
-                        <span className="attachment-item__size" style={{ marginLeft: '8px' }}>({a.file ? Math.round(a.file.file_size / 1024) : 0} KB)</span>
+                    <div key={a.id} className="edit-post__attachment-row">
+                      <div className="edit-post__attachment-info">
+                        <IconPackage size={18} />
+                        <span>{a.display_name || a.file?.original_name}</span>
+                        <span className="edit-post__attachment-size">({a.file ? Math.round(a.file.file_size / 1024) : 0} KB)</span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleDeleteExistingAttachment(a.id)}
-                        style={{ background: 'transparent', color: '#f87171', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+                        onClick={() => setAttachmentToDelete(a.id)}
+                        className="edit-post__attachment-remove-btn"
+                        aria-label={`Remove attachment ${a.display_name || a.file?.original_name}`}
                       >
-                        Remove
+                        <IconTrash size={16} />
+                        <span>Remove</span>
                       </button>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Add More Attachments:</span>
+            <label htmlFor="upload-more-attachments" className="edit-post__section-desc">Add More Attachments:</label>
             <input
+              id="upload-more-attachments"
               type="file"
               multiple
               onChange={(e) => { handleAddNewAttachments(e.target.files); e.target.value = ''; }}
               disabled={saving}
-              className="form-input"
-              style={{ padding: '8px', background: 'var(--bg-primary)' }}
+              className="form-input edit-post__file-upload"
             />
             {newAttachmentItems.length > 0 && (
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: '8px' }}>
+              <div className="motion-arrive-row">
                 {newAttachmentItems.map((item, idx) => (
-                  <li key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 10px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', border: '1px solid var(--border-color)' }}>
-                    <span style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📄 {item.file.name} ({Math.round(item.file.size / 1024)} KB)</span>
+                  <div key={idx} className="edit-post__attachment-row">
+                    <div className="edit-post__attachment-info">
+                      <IconFileText size={18} />
+                      <span>{item.file.name}</span>
+                      <span className="edit-post__attachment-size">({Math.round(item.file.size / 1024)} KB)</span>
+                    </div>
                     <input
                       type="text"
                       placeholder="Display Name"
+                      aria-label={`Display name for archive ${item.file.name}`}
                       value={item.displayName}
                       onChange={(e) => {
                         const next = [...newAttachmentItems];
@@ -526,54 +641,203 @@ export default function EditPostPage() {
                         setNewAttachmentItems(next);
                       }}
                       disabled={saving}
-                      className="form-input"
-                      style={{ width: '180px', padding: '4px 8px', fontSize: '12px', margin: 0 }}
+                      className="form-input edit-post__attachment-name-input"
                     />
                     <button
                       type="button"
                       onClick={() => removeNewAttachment(idx)}
-                      style={{ color: '#f87171', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                      className="edit-post__attachment-remove-btn"
+                      aria-label={`Remove new archive ${item.file.name}`}
                     >
-                      ✕
+                      <IconX size={16} />
+                      <span>Remove</span>
                     </button>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
+            )}
+            {existingAttachments.length === 0 && newAttachmentItems.length === 0 && (
+              <p className="form-helper">
+                No archive bundles attached. Upload ZIP or PDF packages above for visitor downloading.
+              </p>
             )}
           </div>
 
           {saving && (
-            <div style={{ marginTop: '20px', background: 'var(--bg-primary)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: 'var(--fs-sm)', color: 'var(--accent)' }}>
+            <div
+              className="progress-card motion-arrive-card"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <div className="progress-card__header">
                 <span>{statusText}</span>
                 <span>{progressPercent}%</span>
               </div>
-              <div style={{ width: '100%', background: 'var(--bg-elevated)', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${progressPercent}%`, background: 'var(--accent)', height: '100%', transition: 'width 0.3s ease' }} />
+              <div
+                className="progress-bar"
+                role="progressbar"
+                aria-valuenow={progressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className="progress-bar__fill edit-post__progress-fill--animate" style={{ width: `${progressPercent}%` }} />
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '30px' }}>
+          <div className="edit-post__form-actions">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="btn-secondary"
+              className="btn-secondary edit-post__action-btn"
               disabled={saving}
             >
-              Cancel
+              <IconArrowLeft size={16} />
+              <span>Cancel</span>
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary edit-post__action-btn"
               disabled={saving}
-              style={{ padding: '10px 24px', fontWeight: 600 }}
             >
-              {saving ? 'Saving Changes...' : '💾 Save Changes'}
+              {saving ? (
+                <>
+                  <IconRefresh className="admin-icon--spinning" size={18} />
+                  <span>Saving Changes...</span>
+                </>
+              ) : (
+                <>
+                  <IconSave size={18} />
+                  <span>Save Changes</span>
+                </>
+              )}
             </button>
           </div>
         </form>
       </div>
+
+      {/* Declarative Confirmation Dialog for Delete Post */}
+      {showDeletePostModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+          <div className="modal-card motion-arrive-card">
+            <div className="modal-card__header">
+              <IconWarning size={28} />
+              <h3 id="modal-delete-title" className="modal-card__title">Permanent Deletion</h3>
+            </div>
+            <p className="modal-card__text">
+              Are you completely certain you wish to permanently erase this entire post along with all uploaded artwork and archive attachments? This action cannot be reverted.
+            </p>
+            <div className="modal-card__actions">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-secondary modal-card__btn"
+                disabled={saving}
+              >
+                Keep Post
+              </button>
+              <button
+                type="button"
+                onClick={executeDeletePost}
+                className="btn-danger modal-card__btn"
+                disabled={saving}
+              >
+                <IconTrash size={16} />
+                <span>Yes, Delete Post</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Declarative Confirmation Dialog for Existing Media Deletion */}
+      {mediaToDelete && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-media-delete-title">
+          <div className="modal-card motion-arrive-card">
+            <div className="modal-card__header">
+              <IconWarning size={28} />
+              <h3 id="modal-media-delete-title" className="modal-card__title">Delete Artwork</h3>
+            </div>
+            <p className="modal-card__text">
+              Are you sure you want to detach and permanently delete this artwork file from the post?
+            </p>
+            <div className="modal-card__actions">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-secondary modal-card__btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteExistingMedia}
+                className="btn-danger modal-card__btn"
+              >
+                <IconTrash size={16} />
+                <span>Delete Artwork</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Declarative Confirmation Dialog for Existing Attachment Deletion */}
+      {attachmentToDelete && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-att-delete-title">
+          <div className="modal-card motion-arrive-card">
+            <div className="modal-card__header">
+              <IconWarning size={28} />
+              <h3 id="modal-att-delete-title" className="modal-card__title">Delete Attachment</h3>
+            </div>
+            <p className="modal-card__text">
+              Are you sure you want to permanently delete this archive attachment from the post?
+            </p>
+            <div className="modal-card__actions">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-secondary modal-card__btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteExistingAttachment}
+                className="btn-danger modal-card__btn"
+              >
+                <IconTrash size={16} />
+                <span>Delete Attachment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Declarative Error/Info Alert Modal */}
+      {alertMessage && (
+        <div className="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="modal-alert-title">
+          <div className="modal-card motion-arrive-card">
+            <div className="modal-card__header">
+              <IconWarning size={28} />
+              <h3 id="modal-alert-title" className="modal-card__title">Notice</h3>
+            </div>
+            <p className="modal-card__text">
+              {alertMessage}
+            </p>
+            <div className="modal-card__actions">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-primary modal-card__btn"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

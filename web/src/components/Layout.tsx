@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ToastContainer from './Toast';
-import { IconStar, IconBolt, IconUser, IconChevronDown, IconPlus, IconExternalLink } from './Icons';
+import { IconStar, IconBolt, IconUser, IconChevronDown, IconPlus, IconExternalLink, IconEkokanLogo } from './Icons';
 
 export default function Layout() {
   const { user, settings, logout } = useAuth();
@@ -47,7 +47,12 @@ export default function Layout() {
   return (
     <>
       <header className="app-header">
-        <Link to="/" className="app-header__logo">Ekokan</Link>
+        <Link to="/" className="app-header__logo" aria-label="Ekokan Art Gallery Home">
+          <span className="app-header__logo-icon">
+            <IconEkokanLogo size={28} />
+          </span>
+          <span className="app-header__logo-text">Ekokan</span>
+        </Link>
         <nav className="app-header__nav" aria-label="Main navigation">
           <Link to="/" className="app-header__link">Artists</Link>
           <Link to="/tags" className="app-header__link">Tags</Link>
