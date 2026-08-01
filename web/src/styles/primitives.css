@@ -463,19 +463,33 @@
   gap: 4px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fff;
   font-size: var(--fs-xs);
   cursor: pointer;
   transition: all var(--transition-fast);
   z-index: 2;
+  position: relative;
+}
+.fav-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
 }
 .fav-btn:hover {
-  background: rgba(255, 64, 129, 0.2);
-  border-color: #ff4081;
+  background: rgba(255, 82, 119, 0.2);
+  border-color: var(--brand-favorite, #ff5277);
   transform: scale(1.05);
+}
+.fav-btn:focus-visible {
+  outline: 2px solid var(--brand-favorite, #ff5277);
+  outline-offset: 2px;
 }
 @keyframes favStarPulse {
   0% { transform: scale(1); }
@@ -483,14 +497,14 @@
   100% { transform: scale(1) rotate(0deg); }
 }
 .fav-btn--active {
-  background: rgba(255, 64, 129, 0.25);
-  border-color: #ff4081;
-  color: #ff4081;
-  box-shadow: 0 0 12px rgba(255, 64, 129, 0.35);
+  background: rgba(255, 82, 119, 0.25);
+  border-color: var(--brand-favorite, #ff5277);
+  color: var(--brand-favorite, #ff5277);
+  box-shadow: 0 0 12px rgba(255, 82, 119, 0.35);
   animation: favStarPulse 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .fav-btn__count {
-  color: var(--text-inverse);
+  color: var(--text-primary, #e0e0e0);
   font-size: var(--fs-xs);
   font-weight: 700;
 }

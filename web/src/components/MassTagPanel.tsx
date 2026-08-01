@@ -1,7 +1,14 @@
-import { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import type { Tag } from '../types/models';
-import { IconCheck, IconExternalLink } from './Icons';
+import {
+  IconCheck,
+  IconExternalLink,
+  IconTag,
+  IconTrash,
+  IconX,
+  IconFilter,
+} from './Icons';
 
 interface Props {
   tags: Tag[];
@@ -20,7 +27,33 @@ interface Props {
   onRemoveTags: () => void;
 }
 
-export default function MassTagPanel({
+interface TagBadgeProps {
+  tag: Tag;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+}
+
+const TagBadgeItem: React.FC<TagBadgeProps> = React.memo(({ tag, isSelected, onToggle }) => {
+  const handleClick = useCallback(() => {
+    onToggle(tag.id);
+  }, [tag.id, onToggle]);
+
+  return (
+    <button
+      type="button"
+      aria-pressed={isSelected}
+      onClick={handleClick}
+      className={`tag-badge tag-badge--${tag.category || 'general'} ${
+        isSelected ? 'tag-badge--selected' : ''
+      }`}
+    >
+      {isSelected && <IconCheck size={12} aria-hidden={true} />}{' '}
+      <span>{tag.name}</span>
+    </button>
+  );
+});
+
+const MassTagPanel = React.memo(function MassTagPanel({
   tags,
   selectedTagIds,
   selectedPostCount,
@@ -43,8 +76,20 @@ export default function MassTagPanel({
     );
   }, [tags, search]);
 
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onSearchChange(e.target.value);
+    },
+    [onSearchChange],
+  );
+
   return (
-    <div className="tag-panel" role="group" aria-label="Batch post tagging panel">
+    <div
+      className="tag-panel"
+      role="region"
+      aria-label="Batch post tagging control panel"
+      aria-busy={taggingLoading}
+    >
       <div className="tag-panel__header">
         <div>
           <h2 className="tag-panel__title">Batch Post Tagging</h2>
@@ -53,18 +98,38 @@ export default function MassTagPanel({
           </p>
         </div>
         <div className="tag-panel__header-actions">
-          <span className="tag-panel__badge tag-panel__badge--accent">
+          <span
+            className="tag-panel__badge tag-panel__badge--accent"
+            aria-live="polite"
+          >
             Selected Posts: {selectedPostCount}
           </span>
-          <button type="button" onClick={onSelectPage} className="btn-secondary">
-            Select Page ({currentPagePostCount})
+          <button
+            type="button"
+            onClick={onSelectPage}
+            className="btn-secondary"
+            disabled={taggingLoading}
+          >
+            <IconCheck size={14} aria-hidden={true} />
+            <span>Select Page ({currentPagePostCount})</span>
           </button>
-          <button type="button" onClick={onDeselectPage} className="btn-secondary">
-            Deselect Page
+          <button
+            type="button"
+            onClick={onDeselectPage}
+            className="btn-secondary"
+            disabled={taggingLoading}
+          >
+            <span>Deselect Page</span>
           </button>
           {selectedPostCount > 0 && (
-            <button type="button" onClick={onClearSelection} className="btn-danger">
-              Clear Selection
+            <button
+              type="button"
+              onClick={onClearSelection}
+              className="btn-danger"
+              disabled={taggingLoading}
+            >
+              <IconX size={14} aria-hidden={true} />
+              <span>Clear Selection</span>
             </button>
           )}
         </div>
@@ -72,46 +137,49 @@ export default function MassTagPanel({
 
       {taggingStatus && (
         <div className="form-success" role="status" aria-live="polite">
-          <IconCheck size={14} /> {taggingStatus}
+          <IconCheck size={14} aria-hidden={true} /> <span>{taggingStatus}</span>
         </div>
       )}
 
       <div>
         <div className="tag-panel__sub-header">
-          <span className="tag-panel__sub-title">
+          <span className="tag-panel__sub-title" aria-live="polite">
             Choose Tags to Apply / Remove ({selectedTagIds.size} selected)
           </span>
           <div className="tag-panel__sub-actions">
-            <input
-              type="text"
-              placeholder="Filter tags…"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="tag-panel__search-input tag-panel__search-input--compact"
-              aria-label="Filter tags"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '8px', opacity: 0.65, display: 'flex', alignItems: 'center' }} aria-hidden={true}>
+                <IconFilter size={12} />
+              </span>
+              <input
+                type="text"
+                placeholder="Filter tags…"
+                value={search}
+                onChange={handleSearchChange}
+                className="tag-panel__search-input tag-panel__search-input--compact"
+                style={{ paddingLeft: '26px' }}
+                aria-label="Filter tag library by name or category"
+              />
+            </div>
             <Link to="/tags" target="_blank" className="tag-panel__link">
-              Manage Tags <IconExternalLink size={12} />
+              <span>Manage Tags</span> <IconExternalLink size={12} aria-hidden={true} />
             </Link>
           </div>
         </div>
 
-        <div className="tag-panel__grid tag-panel__grid--compact" role="listbox" aria-label="Tag library">
-          {filteredTags.map((tag) => {
-            const isSel = selectedTagIds.has(tag.id);
-            return (
-              <button
-                key={tag.id}
-                type="button"
-                role="option"
-                aria-selected={isSel}
-                onClick={() => onToggleTag(tag.id)}
-                className={`tag-badge tag-badge--${tag.category || 'general'} ${isSel ? 'tag-badge--selected' : ''}`}
-              >
-                {isSel && <IconCheck size={12} />} {tag.name}
-              </button>
-            );
-          })}
+        <div
+          className="tag-panel__grid tag-panel__grid--compact"
+          role="region"
+          aria-label="Tag library selection grid"
+        >
+          {filteredTags.map((tag) => (
+            <TagBadgeItem
+              key={tag.id}
+              tag={tag}
+              isSelected={selectedTagIds.has(tag.id)}
+              onToggle={onToggleTag}
+            />
+          ))}
           {tags.length === 0 && (
             <div className="tag-panel__empty">No tags available in library yet.</div>
           )}
@@ -124,7 +192,12 @@ export default function MassTagPanel({
             disabled={taggingLoading || selectedPostCount === 0 || selectedTagIds.size === 0}
             className="btn-primary"
           >
-            {taggingLoading ? 'Processing…' : `Apply (${selectedTagIds.size}) Tags to (${selectedPostCount}) Posts`}
+            <IconTag size={16} aria-hidden={true} />
+            <span>
+              {taggingLoading
+                ? 'Processing…'
+                : `Apply (${selectedTagIds.size}) Tags to (${selectedPostCount}) Posts`}
+            </span>
           </button>
           <button
             type="button"
@@ -132,10 +205,13 @@ export default function MassTagPanel({
             disabled={taggingLoading || selectedPostCount === 0 || selectedTagIds.size === 0}
             className="btn-secondary btn-secondary--danger"
           >
-            Remove Selected Tags
+            <IconTrash size={16} aria-hidden={true} />
+            <span>Remove Selected Tags</span>
           </button>
         </div>
       </div>
     </div>
   );
-}
+});
+
+export default MassTagPanel;

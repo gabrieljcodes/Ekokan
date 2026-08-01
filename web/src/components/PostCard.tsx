@@ -57,6 +57,13 @@ const PostCard = React.memo(function PostCard({ post, artistSlug, selectable = f
 
   const cardContent = (
     <>
+      {!selectable && (
+        <Link
+          to={`/artist/${artistSlug}/post/${post.id}`}
+          className="post-card__stretched-link"
+          aria-label={`View post: ${post.title}`}
+        />
+      )}
       {selectable && (
         <div className={`post-card__select ${selected ? 'post-card__select--active' : ''}`}>
           {selected && <IconCheck size={14} />}
@@ -89,8 +96,10 @@ const PostCard = React.memo(function PostCard({ post, artistSlug, selectable = f
             className="post-card__thumb"
             loading="lazy"
             onError={(e) => {
-              if (thumb.url && e.currentTarget.src !== thumb.url) {
-                e.currentTarget.src = thumb.url;
+              const target = e.currentTarget;
+              if (!target.dataset.error && thumb.url && target.src !== thumb.url) {
+                target.dataset.error = 'true';
+                target.src = thumb.url;
               }
             }}
           />
@@ -121,10 +130,17 @@ const PostCard = React.memo(function PostCard({ post, artistSlug, selectable = f
         className={`post-card ${selected ? 'post-card--selected' : ''}`}
         role="option"
         aria-selected={selected}
+        tabIndex={0}
         style={style}
         onClick={(e) => {
           e.preventDefault();
           onToggleSelect?.(post.id);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            onToggleSelect?.(post.id);
+          }
         }}
       >
         {cardContent}
@@ -133,13 +149,9 @@ const PostCard = React.memo(function PostCard({ post, artistSlug, selectable = f
   }
 
   return (
-    <Link
-      to={`/artist/${artistSlug}/post/${post.id}`}
-      className="post-card"
-      style={style}
-    >
+    <article className="post-card" style={style}>
       {cardContent}
-    </Link>
+    </article>
   );
 });
 

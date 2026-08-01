@@ -27,6 +27,16 @@ web/.vite/
 .idea/
 .vscode/
 .gemini/
+.agents/
+.claude/
+.impeccable/
+.cursor/
+.cursorrules
+.aider*
+.continue/
+.windsurf/
+agent/
+skills-lock.json
 *.swp
 *.swo
 

@@ -80,31 +80,62 @@
     justify-content: center;
   }
 
-  /* Tag panels: reduce grid height, full-width search */
+  /* Tag panels: ergonomic mobile touch targets and full-width layout ($impeccable) */
   .tag-panel__grid {
-    max-height: 160px;
+    max-height: 180px;
+    gap: 8px;
+  }
+  .tag-panel__grid button.tag-badge {
+    min-height: 38px;
+    padding: 6px 12px;
   }
   .tag-panel__search-input {
     max-width: none;
+    min-height: 44px;
+    width: 100%;
   }
   .tag-panel__header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
   .tag-panel__header-actions {
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .tag-panel__header-actions .tag-panel__badge {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .tag-panel__header-actions button,
+  .tag-panel__actions button {
+    min-height: 44px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
   .tag-panel__sub-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--space-sm);
+  }
+  .tag-panel__sub-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
   .tag-panel__actions {
     flex-direction: column;
+    align-items: stretch;
   }
-  .tag-panel__actions .btn-primary,
-  .tag-panel__actions .btn-secondary {
-    width: 100%;
+  .tag-panel__link {
+    min-height: 44px;
     justify-content: center;
   }
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, AppSettings } from '../types/models';
 import { api } from '../api/client';
 
@@ -37,14 +37,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [excludedTagIds, setExcludedTagIds] = useState<Set<string>>(new Set());
 
-  const refreshSettings = async () => {
+  const refreshSettings = useCallback(async () => {
     try {
       const res = await api.getSettings();
       setSettings(res);
     } catch (e) {
       console.error('Failed loading settings', e);
     }
-  };
+  }, []);
+
+  const hydrateUserState = useCallback((res: {
+    user: User;
+    favorited_post_ids?: string[];
+    favorited_artist_ids?: string[];
+    liked_post_ids?: string[];
+    excluded_tag_ids?: string[];
+  }) => {
+    setUser(res.user);
+    setFavoritedPostIds(new Set(res.favorited_post_ids || []));
+    setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
+    setLikedPostIds(new Set(res.liked_post_ids || []));
+    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
+  }, []);
 
   useEffect(() => {
     refreshSettings();
@@ -55,43 +69,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     api.getMe()
       .then((res) => {
-        setUser(res.user);
-        setFavoritedPostIds(new Set(res.favorited_post_ids || []));
-        setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
-        setLikedPostIds(new Set(res.liked_post_ids || []));
-        setExcludedTagIds(new Set(res.excluded_tag_ids || []));
+        hydrateUserState(res);
       })
-      .catch(() => {
-        localStorage.removeItem('ekokan_token');
-        setToken(null);
-        setUser(null);
+      .catch((e: unknown) => {
+        const err = e as { status?: number; message?: string };
+        const msg = String(err?.message || e).toLowerCase();
+        const isAuthError =
+          err?.status === 401 ||
+          err?.status === 403 ||
+          msg.includes('unauthorized') ||
+          msg.includes('token') ||
+          msg.includes('forbidden');
+
+        if (isAuthError) {
+          localStorage.removeItem('ekokan_token');
+          setToken(null);
+          setUser(null);
+        } else {
+          console.warn('Network error or offline during session validation; preserving credentials.', e);
+        }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshSettings, hydrateUserState]);
 
-  const login = async (data: { username: string; password: string }) => {
+  const login = useCallback(async (data: { username: string; password: string }) => {
     const res = await api.login(data);
     localStorage.setItem('ekokan_token', res.token);
     setToken(res.token);
-    setUser(res.user);
-    setFavoritedPostIds(new Set(res.favorited_post_ids || []));
-    setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
-    setLikedPostIds(new Set(res.liked_post_ids || []));
-    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
-  };
+    hydrateUserState(res);
+  }, [hydrateUserState]);
 
-  const register = async (data: { username: string; email?: string; password: string; display_name?: string }) => {
+  const register = useCallback(async (data: { username: string; email?: string; password: string; display_name?: string }) => {
     const res = await api.register(data);
     localStorage.setItem('ekokan_token', res.token);
     setToken(res.token);
-    setUser(res.user);
-    setFavoritedPostIds(new Set(res.favorited_post_ids || []));
-    setFavoritedArtistIds(new Set(res.favorited_artist_ids || []));
-    setLikedPostIds(new Set(res.liked_post_ids || []));
-    setExcludedTagIds(new Set(res.excluded_tag_ids || []));
-  };
+    hydrateUserState(res);
+  }, [hydrateUserState]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('ekokan_token');
     setToken(null);
     setUser(null);
@@ -99,9 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFavoritedArtistIds(new Set());
     setLikedPostIds(new Set());
     setExcludedTagIds(new Set());
-  };
+  }, []);
 
-  const toggleFavoritePost = async (postId: string): Promise<boolean> => {
+  const toggleFavoritePost = useCallback(async (postId: string): Promise<boolean> => {
     if (!user) throw new Error('Please login to bookmark posts');
     const res = await api.togglePostFavorite(postId);
     setFavoritedPostIds((prev) => {
@@ -111,9 +126,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     return res.is_favorited;
-  };
+  }, [user]);
 
-  const toggleFavoriteArtist = async (artistId: string): Promise<boolean> => {
+  const toggleFavoriteArtist = useCallback(async (artistId: string): Promise<boolean> => {
     if (!user) throw new Error('Please login to favorite creators');
     const res = await api.toggleArtistFavorite(artistId);
     setFavoritedArtistIds((prev) => {
@@ -123,9 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     return res.is_favorited;
-  };
+  }, [user]);
 
-  const toggleLikePost = async (postId: string): Promise<boolean> => {
+  const toggleLikePost = useCallback(async (postId: string): Promise<boolean> => {
     if (!user) throw new Error('Please login to like posts');
     const res = await api.togglePostLike(postId);
     setLikedPostIds((prev) => {
@@ -135,47 +150,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     return res.is_liked;
-  };
+  }, [user]);
 
-  const isFavoritePost = (postId: string) => favoritedPostIds.has(postId);
-  const isFavoriteArtist = (artistId: string) => favoritedArtistIds.has(artistId);
-  const isLikedPost = (postId: string) => likedPostIds.has(postId);
+  const isFavoritePost = useCallback((postId: string) => favoritedPostIds.has(postId), [favoritedPostIds]);
+  const isFavoriteArtist = useCallback((artistId: string) => favoritedArtistIds.has(artistId), [favoritedArtistIds]);
+  const isLikedPost = useCallback((postId: string) => likedPostIds.has(postId), [likedPostIds]);
 
-  const saveExcludedTags = async (tagIds: string[]) => {
+  const saveExcludedTags = useCallback(async (tagIds: string[]) => {
     if (!user) throw new Error('Please login to set persistent tag filters');
     const res = await api.setExcludedTags(tagIds);
     setExcludedTagIds(new Set(res.excluded_tag_ids || []));
-  };
+  }, [user]);
 
-  const updateUserAvatar = (updatedUser: User) => {
+  const updateUserAvatar = useCallback((updatedUser: User) => {
     setUser(updatedUser);
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      loading,
+      settings,
+      refreshSettings,
+      favoritedPostIds,
+      favoritedArtistIds,
+      likedPostIds,
+      excludedTagIds,
+      login,
+      register,
+      logout,
+      toggleFavoritePost,
+      toggleFavoriteArtist,
+      toggleLikePost,
+      isFavoritePost,
+      isFavoriteArtist,
+      isLikedPost,
+      saveExcludedTags,
+      updateUserAvatar,
+    }),
+    [
+      user,
+      token,
+      loading,
+      settings,
+      refreshSettings,
+      favoritedPostIds,
+      favoritedArtistIds,
+      likedPostIds,
+      excludedTagIds,
+      login,
+      register,
+      logout,
+      toggleFavoritePost,
+      toggleFavoriteArtist,
+      toggleLikePost,
+      isFavoritePost,
+      isFavoriteArtist,
+      isLikedPost,
+      saveExcludedTags,
+      updateUserAvatar,
+    ]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        settings,
-        refreshSettings,
-        favoritedPostIds,
-        favoritedArtistIds,
-        likedPostIds,
-        excludedTagIds,
-        login,
-        register,
-        logout,
-        toggleFavoritePost,
-        toggleFavoriteArtist,
-        toggleLikePost,
-        isFavoritePost,
-        isFavoriteArtist,
-        isLikedPost,
-        saveExcludedTags,
-        updateUserAvatar,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+export class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('ekokan_token');
   const headers: Record<string, string> = {
@@ -15,7 +24,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || res.statusText);
+    throw new ApiError(body.error || res.statusText, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -41,7 +50,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || res.statusText);
+    throw new ApiError(body.error || res.statusText, res.status);
   }
   return res.json();
 }
