@@ -194,6 +194,10 @@ export function IconSave(props: IconProps = {}) {
   return svg(props, 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 'M17 21v-8H7v8', 'M7 3v5h8V3');
 }
 
+/**
+ * Vector representation of the Ekokan logo.
+ * Canonical static asset located at web/src/assets/ekokan_logo.svg and web/public/ekokan_logo.svg
+ */
 export function IconEkokanLogo({ size = 28, className, 'aria-hidden': ariaHidden = true }: IconProps = {}) {
   const numericWidth = Number(size) || 28;
   const numericHeight = Math.round((numericWidth * 607) / 703);
