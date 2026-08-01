@@ -194,6 +194,14 @@ export function IconSave(props: IconProps = {}) {
   return svg(props, 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 'M17 21v-8H7v8', 'M7 3v5h8V3');
 }
 
+export function IconCopy(props: IconProps = {}) {
+  return svg(props, 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2', 'M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z');
+}
+
+export function IconKey(props: IconProps = {}) {
+  return svg(props, 'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4');
+}
+
 /**
  * Vector representation of the Ekokan logo.
  * Canonical static asset located at web/src/assets/ekokan_logo.svg and web/public/ekokan_logo.svg

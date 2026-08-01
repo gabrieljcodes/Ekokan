@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../api/client';
 import type { ApiToken } from '../types/models';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { IconKey, IconWarning, IconCheck, IconCopy, IconTrash, IconRefresh } from '../components/Icons';
 
 export default function ApiTokensPage() {
   const { user } = useAuth();
@@ -14,29 +15,49 @@ export default function ApiTokensPage() {
   const [newlyCreatedToken, setNewlyCreatedToken] = useState<ApiToken | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-    loadTokens();
-  }, [user]);
+  const isMountedRef = useRef(true);
+  const timerIdsRef = useRef<number[]>([]);
 
-  const loadTokens = () => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      timerIdsRef.current.forEach((id) => window.clearTimeout(id));
+      timerIdsRef.current = [];
+    };
+  }, []);
+
+  const registerTimer = useCallback((id: number) => {
+    timerIdsRef.current.push(id);
+  }, []);
+
+  const loadTokens = useCallback(() => {
     setLoading(true);
     api.listApiTokens()
       .then((res) => {
-        setTokens(res.tokens || []);
+        if (isMountedRef.current) {
+          setTokens(res.tokens || []);
+        }
       })
-      .catch((err) => setError(err.message || 'Failed to load API tokens'))
-      .finally(() => setLoading(false));
-  };
+      .catch((err: unknown) => {
+        if (isMountedRef.current) {
+          setError((err as Error).message || 'Failed to load API tokens');
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current) setLoading(false);
+      });
+  }, []);
 
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
+  useEffect(() => {
+    if (!user) return;
+    loadTokens();
+  }, [user, loadTokens]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTokenName.trim()) {
-      setError('Please provide a name for the API token');
+      setError('Please provide a descriptive name for the API token');
       return;
     }
     setError('');
@@ -45,197 +66,185 @@ export default function ApiTokensPage() {
     setCopied(false);
     try {
       const created = await api.createApiToken(newTokenName.trim());
-      setNewlyCreatedToken(created);
-      setNewTokenName('');
-      setTokens([created, ...tokens]);
-    } catch (err: unknown) {
-      if (err instanceof Error) setError(err.message || 'Failed to generate token');
-      else setError('Failed to generate token');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleRevoke = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to revoke token "${name}"? Any applications using this token will lose access immediately.`)) {
-      return;
-    }
-    try {
-      await api.deleteApiToken(id);
-      setTokens(tokens.filter((t) => t.id !== id));
-      if (newlyCreatedToken?.id === id) {
-        setNewlyCreatedToken(null);
+      if (isMountedRef.current) {
+        setNewlyCreatedToken(created);
+        setNewTokenName('');
+        setTokens((prev) => [created, ...prev]);
       }
     } catch (err: unknown) {
-      if (err instanceof Error) alert('Error revoking token: ' + err.message);
+      if (isMountedRef.current) {
+        if (err instanceof Error) setError(err.message || 'Failed to generate token');
+        else setError('Failed to generate token');
+      }
+    } finally {
+      if (isMountedRef.current) setCreating(false);
     }
-  };
+  }, [newTokenName]);
 
-  const copyToClipboard = () => {
+  const handleRevoke = useCallback(async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently revoke token "${name}"? Any CLI tools or scripts using this token will lose access immediately.`)) {
+      return;
+    }
+    setError('');
+    try {
+      await api.deleteApiToken(id);
+      if (isMountedRef.current) {
+        setTokens((prev) => prev.filter((t) => t.id !== id));
+        if (newlyCreatedToken?.id === id) {
+          setNewlyCreatedToken(null);
+        }
+      }
+    } catch (err: unknown) {
+      if (isMountedRef.current) {
+        setError((err as Error).message || 'Error revoking automation token.');
+      }
+    }
+  }, [newlyCreatedToken]);
+
+  const copyToClipboard = useCallback(() => {
     if (newlyCreatedToken?.token) {
       navigator.clipboard.writeText(newlyCreatedToken.token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 4000);
+      if (isMountedRef.current) {
+        setCopied(true);
+        const timer = window.setTimeout(() => {
+          if (isMountedRef.current) setCopied(false);
+        }, 4000);
+        registerTimer(timer);
+      }
     }
-  };
+  }, [newlyCreatedToken, registerTimer]);
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
 
   return (
-    <div style={{ padding: '32px 0', maxWidth: '850px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '28px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          🔑 API Tokens & Automation
+    <main role="main" className="api-tokens__container">
+      <header className="api-tokens__header">
+        <h1 className="api-tokens__title">
+          <IconKey size={28} aria-hidden={true} />
+          <span>API Tokens & Automation</span>
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', lineHeight: '1.6' }}>
-          Generate secure, long-lived authentication tokens for tools like <code style={{ color: 'var(--color-primary-light)', backgroundColor: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>kemono-dl</code> or external CLI automation scripts. Tokens generated here inherit your profile permissions ({user.role === 'admin' ? 'Administrator' : 'Standard User'}).
+        <p className="api-tokens__description">
+          Generate secure, long-lived authentication tokens for tools like <code className="api-tokens__code-badge">kemono-dl</code> or external CLI automation scripts. Tokens generated here inherit your profile permissions ({user.role === 'admin' ? 'Administrator' : 'Standard User'}).
         </p>
-      </div>
+      </header>
 
       {error && (
-        <div className="form-error" style={{ marginBottom: '20px' }}>
-          ⚠️ {error}
+        <div className="form-error api-tokens__error-banner" role="alert" aria-live="assertive">
+          <IconWarning size={18} aria-hidden={true} />
+          <span>{error}</span>
         </div>
       )}
 
       {newlyCreatedToken && newlyCreatedToken.token && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.2) 100%)',
-          border: '1px solid rgb(16, 185, 129)',
-          borderRadius: 'var(--radius-md)',
-          padding: '20px',
-          marginBottom: '32px',
-          boxShadow: '0 8px 30px rgba(16, 185, 129, 0.15)',
-          animation: 'fadeIn 0.3s ease-out'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#34d399', fontWeight: '700', fontSize: 'var(--fs-md)', marginBottom: '8px' }}>
-            🎉 API Token Generated Successfully!
+        <section className="api-tokens__success-box motion-arrive-card" role="region" aria-label="Newly generated API token credentials">
+          <div className="api-tokens__success-title" role="status" aria-live="polite">
+            <IconCheck size={20} aria-hidden={true} />
+            <span>API Token Generated Successfully!</span>
           </div>
-          <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '14px' }}>
+          <p className="api-tokens__success-desc">
             Make sure to copy your token immediately. For security reasons, <strong>it will never be displayed again once you leave this page</strong>.
           </p>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <code style={{ flex: 1, fontFamily: 'monospace', fontSize: 'var(--fs-sm)', color: '#fff', wordBreak: 'break-all' }}>
+          <div className="api-tokens__copy-bar">
+            <code className="api-tokens__token-string">
               {newlyCreatedToken.token}
             </code>
             <button
+              type="button"
               onClick={copyToClipboard}
-              style={{
-                background: copied ? '#10b981' : 'var(--color-primary)',
-                color: '#fff',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
+              className={`btn-primary api-tokens__copy-btn ${copied ? 'btn-success' : ''}`}
+              aria-label="Copy newly generated token to clipboard"
             >
-              {copied ? '✓ Copied!' : '📋 Copy Token'}
+              {copied ? (
+                <>
+                  <IconCheck size={16} aria-hidden={true} />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <IconCopy size={16} aria-hidden={true} />
+                  <span>Copy Token</span>
+                </>
+              )}
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      <div style={{
-        background: 'var(--bg-elevated)',
-        padding: '24px',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border-color)',
-        marginBottom: '36px'
-      }}>
-        <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: '600', marginBottom: '16px' }}>Generate a New Token</h2>
-        <form onSubmit={handleCreate} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <section className="api-tokens__form-card motion-arrive-row" aria-labelledby="form-section-title">
+        <h2 id="form-section-title" className="api-tokens__form-title">
+          Generate a New Token
+        </h2>
+        <form onSubmit={handleCreate} className="api-tokens__form-row" aria-busy={creating}>
+          <label htmlFor="token-desc-input" className="sr-only">Token description or purpose</label>
           <input
+            id="token-desc-input"
             type="text"
             placeholder="Token description (e.g., kemono-dl desktop syncer)"
             value={newTokenName}
             onChange={(e) => setNewTokenName(e.target.value)}
             disabled={creating}
-            style={{
-              flex: '1 1 300px',
-              padding: '12px 16px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              fontSize: 'var(--fs-sm)'
-            }}
+            className="form-input api-tokens__input"
             maxLength={100}
+            aria-label="Token description or script purpose"
           />
           <button
             type="submit"
             className="btn-primary"
             disabled={creating || !newTokenName.trim()}
-            style={{ padding: '12px 24px', fontWeight: '600' }}
           >
-            {creating ? 'Generating...' : '+ Generate Token'}
+            <IconKey size={16} aria-hidden={true} />
+            <span>{creating ? 'Generating...' : 'Generate Token'}</span>
           </button>
         </form>
-      </div>
+      </section>
 
-      <div>
-        <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: '600', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <section aria-labelledby="roster-section-title">
+        <h2 id="roster-section-title" className="api-tokens__roster-title">
           <span>Active API Tokens ({tokens.length})</span>
         </h2>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading tokens...</div>
+          <div className="loading" role="status" aria-live="polite">
+            <IconRefresh size={22} aria-hidden={true} />
+            <span>Loading tokens...</span>
+          </div>
         ) : tokens.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>No active API tokens found for your account.</p>
+          <div className="api-tokens__empty-box" role="status" aria-live="polite">
+            <span>No active API tokens found for your account.</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="api-tokens__roster-list" role="region" aria-label="Active API token roster">
             {tokens.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  background: 'var(--bg-card)',
-                  padding: '16px 20px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-color)',
-                  transition: 'border-color 0.2s',
-                }}
-              >
+              <article key={t.id} className="api-tokens__roster-item motion-arrive-row">
                 <div>
-                  <div style={{ fontWeight: '600', fontSize: 'var(--fs-md)', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  <div className="api-tokens__roster-name">
                     {t.name}
                   </div>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-                    <span>Prefix: <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-secondary)' }}>{t.token_prefix}...</code></span>
+                  <div className="api-tokens__roster-meta">
+                    <span>Prefix: <code className="api-tokens__prefix-badge">{t.token_prefix}...</code></span>
                     <span>Created: {new Date(t.created_at).toLocaleDateString()}</span>
                     <span>Last used: {t.last_used_at ? new Date(t.last_used_at).toLocaleString() : 'Never'}</span>
                   </div>
                 </div>
                 <div>
                   <button
+                    type="button"
                     onClick={() => handleRevoke(t.id, t.name)}
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.15)',
-                      color: '#f87171',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      padding: '8px 14px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: 'var(--fs-xs)',
-                      fontWeight: '600',
-                      transition: 'all 0.2s'
-                    }}
-                    title="Revoke access for this token immediately"
-                    onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)')}
-                    onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
+                    className="btn-danger api-tokens__revoke-btn"
+                    title={`Revoke token ${t.name} immediately`}
+                    aria-label={`Revoke automation token ${t.name} immediately`}
                   >
-                    🗑️ Revoke
+                    <IconTrash size={16} aria-hidden={true} />
+                    <span>Revoke</span>
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
