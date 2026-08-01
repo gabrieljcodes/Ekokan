@@ -11,6 +11,7 @@ interface Props {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  style?: React.CSSProperties;
 }
 
 function formatDate(dateStr: string): string {
@@ -18,7 +19,7 @@ function formatDate(dateStr: string): string {
   return d.toISOString().replace('T', ' ').substring(0, 19);
 }
 
-export default function PostCard({ post, artistSlug, selectable = false, selected = false, onToggleSelect }: Props) {
+const PostCard = React.memo(function PostCard({ post, artistSlug, selectable = false, selected = false, onToggleSelect, style }: Props) {
   const thumb = post.media?.[0]?.file;
   const { user, isFavoritePost, toggleFavoritePost, isLikedPost, toggleLikePost } = useAuth();
   const favorited = isFavoritePost(post.id) || post.is_favorited;
@@ -120,6 +121,7 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
         className={`post-card ${selected ? 'post-card--selected' : ''}`}
         role="option"
         aria-selected={selected}
+        style={style}
         onClick={(e) => {
           e.preventDefault();
           onToggleSelect?.(post.id);
@@ -134,8 +136,11 @@ export default function PostCard({ post, artistSlug, selectable = false, selecte
     <Link
       to={`/artist/${artistSlug}/post/${post.id}`}
       className="post-card"
+      style={style}
     >
       {cardContent}
     </Link>
   );
-}
+});
+
+export default PostCard;

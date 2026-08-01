@@ -1,88 +1,195 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist, Post } from '../types/models';
 import ArtistCard from '../components/ArtistCard';
 import PostCard from '../components/PostCard';
+import { IconStar, IconHeart, IconWarning, IconRefresh, IconPlus } from '../components/Icons';
 
 export default function FavoritesPage() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'artists' | 'posts'>('artists');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchFavorites = useCallback(() => {
     setLoading(true);
+    setError(null);
+    let ignore = false;
+
     api.listMyFavorites()
       .then((res) => {
-        setArtists(res.artists || []);
-        setPosts(res.posts || []);
+        if (!ignore) {
+          setArtists(res.artists || []);
+          setPosts(res.posts || []);
+          setError(null);
+        }
       })
-      .catch((err) => setError(err.message || 'Failed to fetch your favorites'))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!ignore) {
+          console.error('Failed to load favorites archive:', err);
+          setError(err.message || 'Failed to contact the Ekokan archive service. Please check your network connection.');
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
-  if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading your favorites gallery...</div>;
-  }
+  useEffect(() => {
+    const cancel = fetchFavorites();
+    return cancel;
+  }, [fetchFavorites]);
 
-  if (error) {
-    return <div className="form-error" style={{ maxWidth: '600px', margin: '40px auto' }}>{error}</div>;
-  }
+  const handleTabChange = useCallback((tab: 'artists' | 'posts') => {
+    setActiveTab(tab);
+  }, []);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const nextTab: 'artists' | 'posts' = activeTab === 'artists' ? 'posts' : 'artists';
+      setActiveTab(nextTab);
+      const nextButton = document.getElementById(`tab-${nextTab}`);
+      nextButton?.focus();
+    }
+  };
 
   return (
-    <div style={{ padding: '24px 0' }}>
-      <div className="action-bar">
-        <div>
-          <h1 style={{ fontSize: 'var(--fs-xl)', fontWeight: '700', marginBottom: '4px' }}>My Favorites Dashboard</h1>
-          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
-            Quick access to your bookmarked creators and cherished gallery updates
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className={`btn-secondary ${activeTab === 'artists' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveTab('artists')}
+    <div className="app-container">
+      <main className="favorites-main" role="main">
+        <div className="favorites-header">
+          <div className="favorites-header__content">
+            <h1 className="favorites-header__title">My Favorites Dashboard</h1>
+            <p className="favorites-header__desc">
+              Quick access to your bookmarked creators and cherished gallery updates
+            </p>
+          </div>
+          <div
+            role="tablist"
+            aria-label="Favorites collection selector"
+            className="favorites-tabs"
           >
-            ⭐ Artists ({artists.length})
-          </button>
-          <button
-            className={`btn-secondary ${activeTab === 'posts' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveTab('posts')}
-          >
-            ❤️ Posts ({posts.length})
-          </button>
+            <button
+              id="tab-artists"
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'artists'}
+              aria-controls="favorites-tab-panel"
+              tabIndex={activeTab === 'artists' ? 0 : -1}
+              className={`btn-secondary favorites-tab-btn ${activeTab === 'artists' ? 'btn-primary' : ''}`}
+              onClick={() => handleTabChange('artists')}
+              onKeyDown={handleTabKeyDown}
+            >
+              <IconStar size={16} aria-hidden={true} />
+              <span>Artists ({artists.length})</span>
+            </button>
+            <button
+              id="tab-posts"
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'posts'}
+              aria-controls="favorites-tab-panel"
+              tabIndex={activeTab === 'posts' ? 0 : -1}
+              className={`btn-secondary favorites-tab-btn ${activeTab === 'posts' ? 'btn-primary' : ''}`}
+              onClick={() => handleTabChange('posts')}
+              onKeyDown={handleTabKeyDown}
+            >
+              <IconHeart size={16} aria-hidden={true} />
+              <span>Posts ({posts.length})</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {activeTab === 'artists' ? (
-        artists.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>You haven't favorited any artists yet.</p>
-            <Link to="/" className="btn-primary">Explore Artist Directory</Link>
-          </div>
-        ) : (
-          <div className="artist-grid">
-            {artists.map((artist) => (
-              <ArtistCard key={artist.id} artist={artist} />
-            ))}
-          </div>
-        )
-      ) : (
-        posts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>No favorited posts in your collection yet.</p>
-            <Link to="/" className="btn-primary">Browse Recent Posts</Link>
-          </div>
-        ) : (
-          <div className="post-grid">
-            {posts.map((post) => (
-              <PostCard key={post.id} post={post} artistSlug={post.artist?.slug || 'unknown'} />
-            ))}
-          </div>
-        )
-      )}
+        <div role="status" aria-live="polite" className="dashboard-status-region">
+          {loading ? (
+            <div className="loading dashboard-loading-state">
+              <span className="loading-spinner" aria-hidden="true" />
+              <span>Loading your favorites gallery...</span>
+            </div>
+          ) : error ? (
+            <div className="dashboard-error-card" role="alert">
+              <IconWarning size={40} className="dashboard-error__icon" aria-hidden={true} />
+              <h2 className="dashboard-error__title">Collection Offline</h2>
+              <p className="dashboard-error__desc">{error}</p>
+              <button
+                type="button"
+                className="btn-primary dashboard-error__retry"
+                onClick={() => fetchFavorites()}
+              >
+                <IconRefresh size={16} aria-hidden={true} />
+                <span>Retry Connection</span>
+              </button>
+            </div>
+          ) : (
+            <div
+              id="favorites-tab-panel"
+              role="tabpanel"
+              aria-labelledby={`tab-${activeTab}`}
+              tabIndex={0}
+              className="favorites-panel"
+            >
+              {activeTab === 'artists' ? (
+                artists.length === 0 ? (
+                  <div className="empty-state dashboard-empty-card">
+                    <IconStar size={48} className="dashboard-empty__icon" aria-hidden={true} />
+                    <h2 className="dashboard-empty__title">No bookmarked creators</h2>
+                    <p className="dashboard-empty__desc">
+                      You haven&apos;t added any creators to your personal favorites yet. Explore the catalog to start collecting.
+                    </p>
+                    <Link to="/" className="btn-primary dashboard-empty__cta">
+                      <IconPlus size={16} aria-hidden={true} />
+                      <span>Explore Artist Directory</span>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="artist-grid">
+                    {artists.map((artist, index) => (
+                      <ArtistCard
+                        key={artist.id}
+                        artist={artist}
+                        style={{ '--card-idx': Math.min(index, 6) } as React.CSSProperties}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : (
+                posts.length === 0 ? (
+                  <div className="empty-state dashboard-empty-card">
+                    <IconHeart size={48} className="dashboard-empty__icon" aria-hidden={true} />
+                    <h2 className="dashboard-empty__title">No liked or favorited posts</h2>
+                    <p className="dashboard-empty__desc">
+                      No artwork or creator posts have been saved to your archive collection yet.
+                    </p>
+                    <Link to="/" className="btn-primary dashboard-empty__cta">
+                      <IconPlus size={16} aria-hidden={true} />
+                      <span>Browse Recent Posts</span>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="post-grid">
+                    {posts.map((post, index) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        artistSlug={post.artist?.slug || 'unknown'}
+                        style={{ '--card-idx': Math.min(index, 6) } as React.CSSProperties}
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
