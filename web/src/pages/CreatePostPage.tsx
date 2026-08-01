@@ -1,7 +1,19 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Artist, Tag } from '../types/models';
+import {
+  IconUpload,
+  IconWarning,
+  IconPlus,
+  IconCheck,
+  IconImage,
+  IconFilm,
+  IconPackage,
+  IconTrash,
+  IconBolt,
+
+} from '../components/Icons';
 
 interface MediaItem {
   file: File;
@@ -35,25 +47,46 @@ export default function CreatePostPage() {
   };
   const [publishedAt, setPublishedAt] = useState(getInitialLocalDatetime);
 
-  // Tags
+  // Tags state
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [newTagCategory, setNewTagCategory] = useState('general');
   const [tagCreating, setTagCreating] = useState(false);
 
-  // Files
+  // Files state
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [attachmentItems, setAttachmentItems] = useState<AttachmentItem[]>([]);
 
-  // Submission state
+  // Submission & network state
   const [loading, setLoading] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const isMountedRef = useRef(true);
+  const mediaRefs = useRef<MediaItem[]>([]);
+
+  useEffect(() => {
+    mediaRefs.current = mediaItems;
+  }, [mediaItems]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // [P0 Fix] Revoke active Object URLs on unmount to prevent browser memory leaks
+      mediaRefs.current.forEach((item) => {
+        if (item.preview) {
+          URL.revokeObjectURL(item.preview);
+        }
+      });
+    };
+  }, []);
+
   useEffect(() => {
     api.listArtists(1, 200).then((res) => {
+      if (!isMountedRef.current) return;
       setArtists(res.data);
       if (initialArtistSlug) {
         const found = res.data.find((a) => a.slug === initialArtistSlug);
@@ -61,12 +94,18 @@ export default function CreatePostPage() {
       } else if (res.data.length > 0 && !selectedArtistId) {
         setSelectedArtistId(res.data[0].id);
       }
-    }).catch(console.error);
+    }).catch((err: unknown) => {
+      console.error('Error loading artists:', err);
+    });
 
-    api.listTags().then(setTags).catch(console.error);
-  }, [initialArtistSlug]);
+    api.listTags().then((loadedTags) => {
+      if (isMountedRef.current) setTags(loadedTags);
+    }).catch((err: unknown) => {
+      console.error('Error loading tags:', err);
+    });
+  }, [initialArtistSlug, selectedArtistId]);
 
-  const handleTitleChange = (val: string) => {
+  const handleTitleChange = useCallback((val: string) => {
     setTitle(val);
     if (!customSlug) {
       const generated = val
@@ -77,65 +116,92 @@ export default function CreatePostPage() {
         .replace(/^-+|-+$/g, '');
       setSlug(generated);
     }
-  };
+  }, [customSlug]);
 
-  const toggleTag = (id: string) => {
-    if (selectedTagIds.includes(id)) {
-      setSelectedTagIds(selectedTagIds.filter((t) => t !== id));
-    } else {
-      setSelectedTagIds([...selectedTagIds, id]);
-    }
-  };
+  const toggleTag = useCallback((id: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    );
+  }, []);
 
-  const handleQuickCreateTag = async () => {
+  const handleQuickCreateTag = useCallback(async () => {
     if (!newTagName.trim()) return;
     setTagCreating(true);
+    setError(null);
     try {
       const created = await api.createTag({
         name: newTagName.trim(),
         category: newTagCategory
       });
-      setTags([...tags, created]);
-      setSelectedTagIds([...selectedTagIds, created.id]);
-      setNewTagName('');
-    } catch (err: any) {
-      alert(err.message || 'Failed to create tag');
+      if (isMountedRef.current) {
+        setTags((prev) => [...prev, created]);
+        setSelectedTagIds((prev) => [...prev, created.id]);
+        setNewTagName('');
+      }
+    } catch (err: unknown) {
+      if (isMountedRef.current) {
+        setError((err as Error).message || 'Failed to create tag. Please verify network connection.');
+      }
     } finally {
-      setTagCreating(false);
+      if (isMountedRef.current) {
+        setTagCreating(false);
+      }
     }
-  };
+  }, [newTagName, newTagCategory]);
 
-  const handleAddMedia = (files: FileList | null) => {
+  const handleAddMedia = useCallback((files: FileList | null) => {
     if (!files) return;
-    const newItems: MediaItem[] = Array.from(files).map((file) => ({
+    const incoming = Array.from(files);
+
+    // Defensive file size validation guardrail (250MB limit per artwork image/video)
+    const oversized = incoming.find((file) => file.size > 250 * 1024 * 1024);
+    if (oversized) {
+      setError(`File "${oversized.name}" exceeds the maximum artwork size limit (250MB).`);
+      return;
+    }
+
+    const newItems: MediaItem[] = incoming.map((file) => ({
       file,
       caption: '',
       preview: URL.createObjectURL(file)
     }));
     setMediaItems((prev) => [...prev, ...newItems]);
-  };
+    setError(null);
+  }, []);
 
-  const removeMedia = (index: number) => {
-    const next = [...mediaItems];
-    URL.revokeObjectURL(next[index].preview);
-    next.splice(index, 1);
-    setMediaItems(next);
-  };
+  const removeMedia = useCallback((index: number) => {
+    setMediaItems((prev) => {
+      const next = [...prev];
+      URL.revokeObjectURL(next[index].preview);
+      next.splice(index, 1);
+      return next;
+    });
+  }, []);
 
-  const handleAddAttachments = (files: FileList | null) => {
+  const handleAddAttachments = useCallback((files: FileList | null) => {
     if (!files) return;
-    const newItems: AttachmentItem[] = Array.from(files).map((file) => ({
+    const incoming = Array.from(files);
+
+    // Defensive attachment size validation guardrail (1GB limit per archive)
+    const oversized = incoming.find((file) => file.size > 1024 * 1024 * 1024);
+    if (oversized) {
+      setError(`Attachment "${oversized.name}" exceeds the maximum archive size limit (1GB).`);
+      return;
+    }
+
+    const newItems: AttachmentItem[] = incoming.map((file) => ({
       file,
       displayName: file.name
     }));
     setAttachmentItems((prev) => [...prev, ...newItems]);
-  };
+    setError(null);
+  }, []);
 
-  const removeAttachment = (index: number) => {
+  const removeAttachment = useCallback((index: number) => {
     setAttachmentItems((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -156,8 +222,10 @@ export default function CreatePostPage() {
 
     setLoading(true);
     try {
-      setStatusText('Creating post metadata...');
-      setProgressPercent(10);
+      if (isMountedRef.current) {
+        setStatusText('Creating post metadata...');
+        setProgressPercent(10);
+      }
 
       const createdPost = await api.createPost({
         artist_id: selectedArtistId,
@@ -174,57 +242,85 @@ export default function CreatePostPage() {
       // Upload media items
       for (let i = 0; i < mediaItems.length; i++) {
         const item = mediaItems[i];
-        setStatusText(`Uploading artwork ${i + 1} of ${mediaItems.length}: ${item.file.name}...`);
+        if (isMountedRef.current) {
+          setStatusText(`Uploading artwork ${i + 1} of ${mediaItems.length}: ${item.file.name}...`);
+        }
         await api.uploadMedia(createdPost.id, item.file, item.caption.trim());
         finishedFiles++;
-        setProgressPercent(10 + Math.round((finishedFiles / Math.max(1, totalFiles)) * 85));
+        if (isMountedRef.current) {
+          setProgressPercent(10 + Math.round((finishedFiles / Math.max(1, totalFiles)) * 85));
+        }
       }
 
       // Upload attachment archives
       for (let i = 0; i < attachmentItems.length; i++) {
         const item = attachmentItems[i];
-        setStatusText(`Uploading file ${i + 1} of ${attachmentItems.length}: ${item.file.name}...`);
+        if (isMountedRef.current) {
+          setStatusText(`Uploading file ${i + 1} of ${attachmentItems.length}: ${item.file.name}...`);
+        }
         await api.uploadAttachment(createdPost.id, item.file, item.displayName.trim());
         finishedFiles++;
-        setProgressPercent(10 + Math.round((finishedFiles / Math.max(1, totalFiles)) * 85));
+        if (isMountedRef.current) {
+          setProgressPercent(10 + Math.round((finishedFiles / Math.max(1, totalFiles)) * 85));
+        }
       }
 
-      setStatusText('Upload completed! Redirecting...');
-      setProgressPercent(100);
-      navigate(`/artist/${artist.slug}/post/${createdPost.id}`);
-    } catch (err: any) {
+      if (isMountedRef.current) {
+        setStatusText('Upload completed! Redirecting...');
+        setProgressPercent(100);
+        navigate(`/artist/${artist.slug}/post/${createdPost.id}`);
+      }
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Error creating post or uploading files');
-      setLoading(false);
+      if (isMountedRef.current) {
+        setError((err as Error).message || 'Error creating post or uploading files');
+        setLoading(false);
+      }
     }
-  };
+  }, [selectedArtistId, title, slug, content, selectedTagIds, publishedAt, mediaItems, attachmentItems, artists, navigate]);
 
   return (
-    <div className="app-container">
-      <div className="breadcrumb">
+    <main role="main" className="app-container">
+      <nav aria-label="Breadcrumb" className="breadcrumb">
         <Link to="/">Gallery</Link> &nbsp;/&nbsp; <span>Upload New Post</span>
-      </div>
+      </nav>
 
       <div className="form-card">
         <div className="form-card__header">
-          <h1 className="form-card__title">📤 Upload New Art Post</h1>
+          <h1 className="form-card__title">
+            <span className="create-post__title-icon">
+              <IconUpload size={28} aria-hidden={true} />
+              <span>Upload New Art Post</span>
+            </span>
+          </h1>
           <p className="form-card__subtitle">
             Create an archive post with high-res illustrations, tags, and downloadable bonus files.
           </p>
         </div>
 
-        {error && <div className="form-error">⚠️ {error}</div>}
+        {error && (
+          <div className="form-error" role="alert" aria-live="assertive">
+            <IconWarning size={18} aria-hidden={true} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="form-stack">
           {/* Artist Selector */}
           <div className="form-group">
-            <label className="form-label">
-              Artist / Creator <span style={{ color: 'var(--danger)' }}>*</span>
-              <Link to="/artists/new" style={{ fontWeight: 500, fontSize: 'var(--fs-xs)' }}>
-                + Create New Artist
+            <div className="create-post__label-row">
+              <label htmlFor="create-artist-select" className="form-label">
+                <span>Artist / Creator</span>
+                <span className="create-post__required-mark" aria-hidden="true">*</span>
+                <span className="sr-only">(Required)</span>
+              </label>
+              <Link to="/artists/new" className="create-post__label-link">
+                <IconPlus size={14} aria-hidden={true} />
+                <span>Create New Artist</span>
               </Link>
-            </label>
+            </div>
             <select
+              id="create-artist-select"
               value={selectedArtistId}
               onChange={(e) => setSelectedArtistId(e.target.value)}
               required
@@ -248,10 +344,13 @@ export default function CreatePostPage() {
 
           {/* Title */}
           <div className="form-group">
-            <label className="form-label">
-              Post Title <span style={{ color: 'var(--danger)' }}>*</span>
+            <label htmlFor="create-title-input" className="form-label">
+              <span>Post Title</span>
+              <span className="create-post__required-mark" aria-hidden="true">*</span>
+              <span className="sr-only">(Required)</span>
             </label>
             <input
+              id="create-title-input"
               type="text"
               placeholder="e.g. Summer Vacation Illustration Pack #04"
               value={title}
@@ -263,11 +362,14 @@ export default function CreatePostPage() {
 
           {/* Slug */}
           <div className="form-group">
-            <label className="form-label">
-              URL Slug <span style={{ color: 'var(--danger)' }}>*</span>
+            <label htmlFor="create-slug-input" className="form-label">
+              <span>URL Slug</span>
+              <span className="create-post__required-mark" aria-hidden="true">*</span>
+              <span className="sr-only">(Required)</span>
               <span className="form-label__hint">Auto-generated identifier</span>
             </label>
             <input
+              id="create-slug-input"
               type="text"
               placeholder="e.g. summer-vacation-illustration-pack-04"
               value={slug}
@@ -282,11 +384,12 @@ export default function CreatePostPage() {
 
           {/* Content / Notes */}
           <div className="form-group">
-            <label className="form-label">
-              Description & Commentary
+            <label htmlFor="create-description-textarea" className="form-label">
+              <span>Description & Commentary</span>
               <span className="form-label__hint">Optional</span>
             </label>
             <textarea
+              id="create-description-textarea"
               rows={5}
               placeholder="Artist remarks, translation, source links, or archiving commentary..."
               value={content}
@@ -298,7 +401,7 @@ export default function CreatePostPage() {
           {/* Published At Date / Time */}
           <div className="form-group">
             <label htmlFor="create-published-at" className="form-label">
-              Published Date & Time
+              <span>Published Date & Time</span>
               <span className="form-label__hint">Optional</span>
             </label>
             <input
@@ -307,55 +410,67 @@ export default function CreatePostPage() {
               value={publishedAt}
               onChange={(e) => setPublishedAt(e.target.value)}
               disabled={loading}
-              style={{ colorScheme: 'dark', width: '100%' }}
+              className="create-post__datetime-input"
             />
             <span className="form-helper">
-              Set the original publication timestamp of this artwork or post. Defaults to the current time if unchanged.
+              Set the original publication timestamp of this artwork or post. Defaults to current local clock if unchanged.
             </span>
           </div>
 
           {/* Tags Picker & Creator */}
-          <div className="form-group">
-            <label className="form-label">
-              Tags & Categories
+          <div className="form-group" role="region" aria-label="Tag categorization">
+            <span className="form-label" id="create-tags-heading">
+              <span>Tags & Categories</span>
               <span className="form-label__hint">{selectedTagIds.length} selected</span>
-            </label>
-            <div className="tag-selector">
+            </span>
+            
+            <div className="tag-selector" aria-labelledby="create-tags-heading">
               {tags.length === 0 ? (
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>No tags created yet. Add one below!</span>
+                <span className="create-post__tag-empty">No tags created yet. Add one below!</span>
               ) : (
                 tags.map((tag) => {
                   const isSelected = selectedTagIds.includes(tag.id);
                   return (
-                    <span
+                    <button
                       key={tag.id}
-                      className={`tag-badge tag-badge--${tag.category || 'general'} tag-selector__pill ${
-                        isSelected ? 'tag-selector__pill--selected' : ''
-                      }`}
-                      style={isSelected ? { opacity: 1, boxShadow: '0 0 0 2px var(--text-primary)' } : { opacity: 0.6 }}
+                      type="button"
+                      aria-pressed={isSelected}
                       onClick={() => toggleTag(tag.id)}
+                      className={`tag-badge tag-badge--${tag.category || 'general'} tag-selector__pill create-post__tag-btn ${
+                        isSelected ? 'create-post__tag-pill--selected' : 'create-post__tag-pill--unselected'
+                      }`.trim()}
                     >
-                      {isSelected ? '✓ ' : '+ '}{tag.name}
-                    </span>
+                      {isSelected ? (
+                        <IconCheck size={13} aria-hidden={true} />
+                      ) : (
+                        <IconPlus size={13} aria-hidden={true} />
+                      )}
+                      <span>{tag.name}</span>
+                    </button>
                   );
                 })
               )}
             </div>
 
             {/* Inline Quick Create Tag */}
-            <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)', alignItems: 'center' }}>
+            <div className="create-post__quick-tag-row">
+              <label htmlFor="create-tag-name-input" className="sr-only">New tag name</label>
               <input
+                id="create-tag-name-input"
                 type="text"
                 placeholder="New tag name..."
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
-                style={{ width: '200px', fontSize: 'var(--fs-xs)', padding: '6px 10px' }}
+                className="form-input create-post__quick-tag-input"
                 disabled={loading || tagCreating}
               />
+
+              <label htmlFor="create-tag-cat-select" className="sr-only">New tag category</label>
               <select
+                id="create-tag-cat-select"
                 value={newTagCategory}
                 onChange={(e) => setNewTagCategory(e.target.value)}
-                style={{ width: '130px', fontSize: 'var(--fs-xs)', padding: '6px 10px' }}
+                className="form-input create-post__quick-tag-select"
                 disabled={loading || tagCreating}
               >
                 <option value="general">General</option>
@@ -364,54 +479,65 @@ export default function CreatePostPage() {
                 <option value="artist">Artist</option>
                 <option value="meta">Meta</option>
               </select>
+
               <button
                 type="button"
-                className="btn-secondary"
-                style={{ fontSize: 'var(--fs-xs)', padding: '6px 12px' }}
+                className="btn-secondary create-post__quick-tag-btn"
                 onClick={handleQuickCreateTag}
                 disabled={loading || tagCreating || !newTagName.trim()}
+                aria-label="Quickly create and select this tag"
               >
-                {tagCreating ? 'Adding...' : '+ Quick Add Tag'}
+                <IconPlus size={14} aria-hidden={true} />
+                <span>{tagCreating ? 'Adding...' : 'Quick Add Tag'}</span>
               </button>
             </div>
           </div>
 
           {/* Media Gallery Uploads */}
-          <div className="form-group" style={{ marginTop: 'var(--space-xl)' }}>
-            <label className="form-label">
-              🖼️ Artwork / Media Gallery
+          <div className="form-group create-post__group--spaced">
+            <label htmlFor="create-media-dropzone-input" className="form-label">
+              <span className="create-post__title-icon">
+                <IconImage size={20} aria-hidden={true} />
+                <span>Artwork & Media Gallery</span>
+              </span>
               <span className="form-label__hint">Illustrations, comics, animations</span>
             </label>
             
             <div className="dropzone">
               <input
+                id="create-media-dropzone-input"
                 type="file"
                 multiple
                 accept="image/*,video/*"
                 className="dropzone__input"
                 onChange={(e) => handleAddMedia(e.target.files)}
                 disabled={loading}
+                aria-label="Upload artwork images or videos to gallery"
               />
-              <div className="dropzone__icon">📚</div>
+              <div className="dropzone__icon" aria-hidden="true">
+                <IconImage size={40} />
+              </div>
               <div className="dropzone__text">Click or drop multiple images & videos here</div>
-              <div className="dropzone__subtext">Select multiple files at once — Order is maintained</div>
+              <div className="dropzone__subtext">Select multiple files at once — Order is maintained (Max 250MB/file)</div>
             </div>
 
             {mediaItems.length > 0 && (
               <div className="file-preview-list">
                 {mediaItems.map((item, idx) => (
-                  <div key={idx} className="file-preview-item">
+                  <div key={idx} className="file-preview-item motion-arrive-row">
                     {item.file.type.startsWith('video') ? (
-                      <div className="file-preview-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        🎥
+                      <div className="file-preview-item__thumb create-post__thumb--video" aria-hidden="true">
+                        <IconFilm size={24} />
                       </div>
                     ) : (
-                      <img src={item.preview} alt="" className="file-preview-item__thumb" />
+                      <img src={item.preview} alt="" aria-hidden="true" className="file-preview-item__thumb" decoding="async" />
                     )}
                     <div className="file-preview-item__info">
                       <div className="file-preview-item__name">#{idx + 1} — {item.file.name}</div>
                       <div className="file-preview-item__size">{Math.round(item.file.size / 1024)} KB</div>
+                      <label htmlFor={`media-caption-${idx}`} className="sr-only">Caption for image {idx + 1}</label>
                       <input
+                        id={`media-caption-${idx}`}
                         type="text"
                         placeholder="Optional image caption..."
                         value={item.caption}
@@ -420,17 +546,18 @@ export default function CreatePostPage() {
                           next[idx].caption = e.target.value;
                           setMediaItems(next);
                         }}
-                        style={{ marginTop: '4px', width: '100%', fontSize: 'var(--fs-xs)', padding: '4px 8px' }}
+                        className="form-input create-post__caption-input"
                         disabled={loading}
                       />
                     </div>
                     <button
                       type="button"
-                      className="btn-danger"
+                      className="btn-danger create-post__delete-btn"
                       onClick={() => removeMedia(idx)}
                       disabled={loading}
+                      aria-label={`Remove image ${item.file.name}`}
                     >
-                      ✕
+                      <IconTrash size={16} aria-hidden={true} />
                     </button>
                   </div>
                 ))}
@@ -439,34 +566,44 @@ export default function CreatePostPage() {
           </div>
 
           {/* Attachments / Archives Uploads */}
-          <div className="form-group" style={{ marginTop: 'var(--space-lg)' }}>
-            <label className="form-label">
-              📦 Downloadable Attachments
+          <div className="form-group create-post__group--attachments">
+            <label htmlFor="create-attachment-dropzone-input" className="form-label">
+              <span className="create-post__title-icon">
+                <IconPackage size={20} aria-hidden={true} />
+                <span>Downloadable Attachments</span>
+              </span>
               <span className="form-label__hint">ZIPs, PSDs, brush sets, PDFs</span>
             </label>
 
-            <div className="dropzone" style={{ padding: 'var(--space-lg)' }}>
+            <div className="dropzone create-post__dropzone--attachments">
               <input
+                id="create-attachment-dropzone-input"
                 type="file"
                 multiple
                 className="dropzone__input"
                 onChange={(e) => handleAddAttachments(e.target.files)}
                 disabled={loading}
+                aria-label="Upload archive attachments such as ZIP or PSD files"
               />
-              <div className="dropzone__icon" style={{ fontSize: 'var(--fs-xl)' }}>📁</div>
+              <div className="dropzone__icon" aria-hidden="true">
+                <IconPackage size={42} />
+              </div>
               <div className="dropzone__text">Click or drop zip files, PSDs, or extras here</div>
+              <div className="dropzone__subtext">Support for large archives and brushes (Max 1GB/file)</div>
             </div>
 
             {attachmentItems.length > 0 && (
               <div className="file-preview-list">
                 {attachmentItems.map((item, idx) => (
-                  <div key={idx} className="file-preview-item">
-                    <div className="file-preview-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                      📦
+                  <div key={idx} className="file-preview-item motion-arrive-row">
+                    <div className="file-preview-item__thumb create-post__thumb--archive" aria-hidden="true">
+                      <IconPackage size={26} />
                     </div>
                     <div className="file-preview-item__info">
                       <div className="file-preview-item__name">
+                        <label htmlFor={`attachment-name-${idx}`} className="sr-only">Display filename for attachment {idx + 1}</label>
                         <input
+                          id={`attachment-name-${idx}`}
                           type="text"
                           value={item.displayName}
                           onChange={(e) => {
@@ -475,7 +612,7 @@ export default function CreatePostPage() {
                             setAttachmentItems(next);
                           }}
                           placeholder="Display filename (e.g. High-Res Lineart.zip)"
-                          style={{ width: '100%', fontSize: 'var(--fs-sm)' }}
+                          className="form-input create-post__attachment-name-input"
                           disabled={loading}
                         />
                       </div>
@@ -483,11 +620,12 @@ export default function CreatePostPage() {
                     </div>
                     <button
                       type="button"
-                      className="btn-danger"
+                      className="btn-danger create-post__delete-btn"
                       onClick={() => removeAttachment(idx)}
                       disabled={loading}
+                      aria-label={`Remove attachment ${item.file.name}`}
                     >
-                      ✕
+                      <IconTrash size={16} aria-hidden={true} />
                     </button>
                   </div>
                 ))}
@@ -496,24 +634,42 @@ export default function CreatePostPage() {
           </div>
 
           {loading && (
-            <div className="progress-box">
-              <div className="progress-box__title">🚀 {statusText || 'Uploading...'}</div>
-              <div className="progress-bar">
+            <div className="progress-box" role="status" aria-live="polite">
+              <div className="progress-box__title create-post__title-icon">
+                <IconBolt size={20} aria-hidden={true} />
+                <span>{statusText || 'Uploading in progress...'}</span>
+              </div>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                aria-valuenow={progressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
                 <div className="progress-bar__fill" style={{ width: `${progressPercent}%` }} />
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-md)', marginTop: 'var(--space-xl)' }}>
-            <Link to={initialArtistSlug ? `/artist/${initialArtistSlug}` : '/'} className="btn-secondary" style={{ padding: 'var(--space-sm) var(--space-lg)' }}>
-              Cancel
+          <div className="create-post__form-actions">
+            <Link
+              to={initialArtistSlug ? `/artist/${initialArtistSlug}` : '/'}
+              className="btn-secondary create-post__action-btn"
+              aria-disabled={loading}
+            >
+              <span>Cancel</span>
             </Link>
-            <button type="submit" className="btn-primary" disabled={loading || artists.length === 0}>
-              {loading ? `Uploading (${progressPercent}%)...` : '✓ Publish & Upload Post'}
+            <button
+              type="submit"
+              className="btn-primary create-post__action-btn"
+              disabled={loading || artists.length === 0}
+            >
+              <IconCheck size={16} aria-hidden={true} />
+              <span>{loading ? `Uploading (${progressPercent}%)...` : 'Publish & Upload Post'}</span>
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
