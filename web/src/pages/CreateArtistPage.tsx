@@ -1,6 +1,17 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import {
+  IconUser,
+  IconWarning,
+  IconImage,
+  IconExternalLink,
+  IconPlus,
+  IconTrash,
+  IconCheck,
+  IconBolt,
+
+} from '../components/Icons';
 
 export default function CreateArtistPage() {
   const navigate = useNavigate();
@@ -15,39 +26,93 @@ export default function CreateArtistPage() {
     { label: 'Pixiv', url: '' }
   ]);
 
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleNameChange = (val: string) => {
-    setName(val);
-  };
+  const isMountedRef = useRef(true);
 
-  const avatarPreview = useMemo(() => {
-    if (!avatarFile) return null;
-    return URL.createObjectURL(avatarFile);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // [P0 Fix] Manage Avatar preview blob URL and revoke upon change/unmount to eliminate memory leaks
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreview(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
   }, [avatarFile]);
 
-  const bannerPreview = useMemo(() => {
-    if (!bannerFile) return null;
-    return URL.createObjectURL(bannerFile);
+  // [P0 Fix] Manage Banner preview blob URL and revoke upon change/unmount to eliminate memory leaks
+  useEffect(() => {
+    if (!bannerFile) {
+      setBannerPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(bannerFile);
+    setBannerPreview(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
   }, [bannerFile]);
 
-  const addLinkField = () => {
-    setLinks([...links, { label: '', url: '' }]);
-  };
+  const handleNameChange = useCallback((val: string) => {
+    setName(val);
+  }, []);
 
-  const updateLink = (index: number, key: 'label' | 'url', value: string) => {
-    const next = [...links];
-    next[index][key] = value;
-    setLinks(next);
-  };
+  const handleAvatarSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Defensive client-side filesize guardrail (50MB maximum for avatars)
+    if (file.size > 50 * 1024 * 1024) {
+      setError(`Avatar image "${file.name}" exceeds the maximum file size limit (50MB).`);
+      return;
+    }
+    setAvatarFile(file);
+    setError(null);
+  }, []);
 
-  const removeLink = (index: number) => {
-    setLinks(links.filter((_, i) => i !== index));
-  };
+  const handleBannerSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Defensive client-side filesize guardrail (150MB maximum for cover banners)
+    if (file.size > 150 * 1024 * 1024) {
+      setError(`Banner image "${file.name}" exceeds the maximum file size limit (150MB).`);
+      return;
+    }
+    setBannerFile(file);
+    setError(null);
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const addLinkField = useCallback(() => {
+    setLinks((prev) => [...prev, { label: '', url: '' }]);
+  }, []);
+
+  const updateLink = useCallback((index: number, key: 'label' | 'url', value: string) => {
+    setLinks((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  }, []);
+
+  const removeLink = useCallback((index: number) => {
+    setLinks((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -62,7 +127,7 @@ export default function CreateArtistPage() {
 
     setLoading(true);
     try {
-      setStatusText('Creating artist profile...');
+      if (isMountedRef.current) setStatusText('Creating artist profile...');
       const linksMap: Record<string, string> = {};
       for (const item of links) {
         if (item.label.trim() && item.url.trim()) {
@@ -78,46 +143,64 @@ export default function CreateArtistPage() {
       });
 
       if (avatarFile) {
-        setStatusText('Uploading avatar...');
+        if (isMountedRef.current) setStatusText('Uploading avatar image...');
         await api.uploadAvatar(created.id, avatarFile);
       }
 
       if (bannerFile) {
-        setStatusText('Uploading banner...');
+        if (isMountedRef.current) setStatusText('Uploading profile banner image...');
         await api.uploadBanner(created.id, bannerFile);
       }
 
-      setStatusText('Done! Redirecting...');
-      navigate(`/artist/${created.slug}`);
-    } catch (err: any) {
+      if (isMountedRef.current) {
+        setStatusText('Profile created! Redirecting to gallery...');
+        navigate(`/artist/${created.slug}`);
+      }
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Failed to create artist');
-      setLoading(false);
+      if (isMountedRef.current) {
+        setError((err as Error).message || 'Failed to create artist profile');
+        setLoading(false);
+      }
     }
-  };
+  }, [name, slug, bio, links, avatarFile, bannerFile, navigate]);
 
   return (
-    <div className="app-container">
-      <div className="breadcrumb">
+    <main role="main" className="app-container">
+      <nav aria-label="Breadcrumb" className="breadcrumb">
         <Link to="/">Artists</Link> &nbsp;/&nbsp; <span>New Artist Profile</span>
-      </div>
+      </nav>
 
       <div className="form-card">
         <div className="form-card__header">
-          <h1 className="form-card__title">✨ Create New Artist</h1>
+          <h1 className="form-card__title">
+            <span className="create-artist__title-icon">
+              <IconUser size={28} aria-hidden={true} />
+              <span>Create New Artist</span>
+            </span>
+          </h1>
           <p className="form-card__subtitle">
             Add an illustrator, creator, or art studio to your personal Ekokan gallery.
           </p>
         </div>
 
-        {error && <div className="form-error">⚠️ {error}</div>}
+        {error && (
+          <div className="form-error" role="alert" aria-live="assertive">
+            <IconWarning size={18} aria-hidden={true} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="form-stack">
+          {/* Artist Name */}
           <div className="form-group">
-            <label className="form-label">
-              Artist Name <span style={{ color: 'var(--danger)' }}>*</span>
+            <label htmlFor="create-artist-name" className="form-label">
+              <span>Artist Name</span>
+              <span className="create-artist__required-mark" aria-hidden="true">*</span>
+              <span className="sr-only">(Required)</span>
             </label>
             <input
+              id="create-artist-name"
               type="text"
               placeholder="e.g. Mika Pikazo, Kantoku, Mochizuki Kei"
               value={name}
@@ -128,12 +211,16 @@ export default function CreateArtistPage() {
             <span className="form-helper">The primary visual display name of the artist.</span>
           </div>
 
+          {/* Artist URL ID / Slug */}
           <div className="form-group">
-            <label className="form-label">
-              Artist URL ID <span style={{ color: 'var(--danger)' }}>*</span>
+            <label htmlFor="create-artist-slug" className="form-label">
+              <span>Artist URL ID</span>
+              <span className="create-artist__required-mark" aria-hidden="true">*</span>
+              <span className="sr-only">(Required)</span>
               <span className="form-label__hint">Numeric or Creator ID (e.g., 37736420)</span>
             </label>
             <input
+              id="create-artist-slug"
               type="text"
               placeholder="e.g. 37736420"
               value={slug}
@@ -144,12 +231,14 @@ export default function CreateArtistPage() {
             <span className="form-helper">Accessed via /artist/<strong>{slug || '37736420'}</strong></span>
           </div>
 
+          {/* Biography / Notes */}
           <div className="form-group">
-            <label className="form-label">
-              Biography / Notes
+            <label htmlFor="create-artist-bio" className="form-label">
+              <span>Biography & Notes</span>
               <span className="form-label__hint">Optional</span>
             </label>
             <textarea
+              id="create-artist-bio"
               rows={4}
               placeholder="Brief overview, style descriptions, or personal archiving notes..."
               value={bio}
@@ -160,26 +249,30 @@ export default function CreateArtistPage() {
 
           {/* Avatar Upload */}
           <div className="form-group">
-            <label className="form-label">
-              Avatar Image
+            <label htmlFor="create-avatar-input" className="form-label">
+              <span>Avatar Image</span>
               <span className="form-label__hint">Square aspect ratio recommended</span>
             </label>
             {!avatarPreview ? (
               <div className="dropzone">
                 <input
+                  id="create-avatar-input"
                   type="file"
                   accept="image/*"
                   className="dropzone__input"
-                  onChange={(e) => e.target.files?.[0] && setAvatarFile(e.target.files[0])}
+                  onChange={handleAvatarSelect}
                   disabled={loading}
+                  aria-label="Upload artist avatar image (PNG, JPG, WebP supported)"
                 />
-                <div className="dropzone__icon">🖼️</div>
+                <div className="dropzone__icon" aria-hidden="true">
+                  <IconImage size={40} />
+                </div>
                 <div className="dropzone__text">Click or drag an image here to upload avatar</div>
-                <div className="dropzone__subtext">PNG, JPG, WebP supported</div>
+                <div className="dropzone__subtext">PNG, JPG, WebP supported (Max 50MB)</div>
               </div>
             ) : (
-              <div className="file-preview-item">
-                <img src={avatarPreview} alt="Avatar preview" className="file-preview-item__thumb" />
+              <div className="file-preview-item motion-arrive-row">
+                <img src={avatarPreview} alt="Avatar preview thumbnail" className="file-preview-item__thumb" decoding="async" />
                 <div className="file-preview-item__info">
                   <div className="file-preview-item__name">{avatarFile?.name}</div>
                   <div className="file-preview-item__size">
@@ -188,11 +281,13 @@ export default function CreateArtistPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="btn-danger create-artist__remove-link-btn"
                   onClick={() => setAvatarFile(null)}
                   disabled={loading}
+                  aria-label="Remove selected avatar image"
                 >
-                  Remove
+                  <IconTrash size={16} aria-hidden={true} />
+                  <span>Remove</span>
                 </button>
               </div>
             )}
@@ -200,30 +295,34 @@ export default function CreateArtistPage() {
 
           {/* Banner Upload */}
           <div className="form-group">
-            <label className="form-label">
-              Profile Banner Image
+            <label htmlFor="create-banner-input" className="form-label">
+              <span>Profile Banner Image</span>
               <span className="form-label__hint">Wide cover background (e.g. 1920x400)</span>
             </label>
             {!bannerPreview ? (
               <div className="dropzone">
                 <input
+                  id="create-banner-input"
                   type="file"
                   accept="image/*"
                   className="dropzone__input"
-                  onChange={(e) => e.target.files?.[0] && setBannerFile(e.target.files[0])}
+                  onChange={handleBannerSelect}
                   disabled={loading}
+                  aria-label="Upload artist cover banner illustration (Large widescreen illustrations recommended)"
                 />
-                <div className="dropzone__icon">🌄</div>
+                <div className="dropzone__icon" aria-hidden="true">
+                  <IconImage size={42} />
+                </div>
                 <div className="dropzone__text">Click or drag a cover banner here</div>
-                <div className="dropzone__subtext">Large widescreen illustrations work best</div>
+                <div className="dropzone__subtext">Large widescreen illustrations work best (Max 150MB)</div>
               </div>
             ) : (
-              <div className="file-preview-item">
+              <div className="file-preview-item motion-arrive-row">
                 <img
                   src={bannerPreview}
-                  alt="Banner preview"
-                  className="file-preview-item__thumb"
-                  style={{ width: '120px', height: '40px' }}
+                  alt="Banner cover preview thumbnail"
+                  className="create-artist__banner-thumb"
+                  decoding="async"
                 />
                 <div className="file-preview-item__info">
                   <div className="file-preview-item__name">{bannerFile?.name}</div>
@@ -233,79 +332,106 @@ export default function CreateArtistPage() {
                 </div>
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="btn-danger create-artist__remove-link-btn"
                   onClick={() => setBannerFile(null)}
                   disabled={loading}
+                  aria-label="Remove selected banner illustration"
                 >
-                  Remove
+                  <IconTrash size={16} aria-hidden={true} />
+                  <span>Remove</span>
                 </button>
               </div>
             )}
           </div>
 
           {/* External Links */}
-          <div className="form-group">
-            <label className="form-label">External Links</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+          <div className="form-group" role="region" aria-label="External portfolio links">
+            <span className="form-label" id="create-links-heading">
+              <span className="create-artist__title-icon">
+                <IconExternalLink size={18} aria-hidden={true} />
+                <span>External Links & Portfolios</span>
+              </span>
+            </span>
+
+            <div className="create-artist__links-stack" aria-labelledby="create-links-heading">
               {links.map((link, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                <div key={idx} className="create-artist__link-row motion-arrive-row">
+                  <label htmlFor={`artist-link-label-${idx}`} className="sr-only">Platform name for link {idx + 1}</label>
                   <input
+                    id={`artist-link-label-${idx}`}
                     type="text"
                     placeholder="Platform (e.g. Pixiv)"
                     value={link.label}
                     onChange={(e) => updateLink(idx, 'label', e.target.value)}
-                    style={{ width: '180px' }}
+                    className="form-input create-artist__link-label"
                     disabled={loading}
                   />
+
+                  <label htmlFor={`artist-link-url-${idx}`} className="sr-only">Web address URL for link {idx + 1}</label>
                   <input
+                    id={`artist-link-url-${idx}`}
                     type="url"
                     placeholder="https://..."
                     value={link.url}
                     onChange={(e) => updateLink(idx, 'url', e.target.value)}
-                    style={{ flex: 1 }}
+                    className="form-input create-artist__link-url"
                     disabled={loading}
                   />
+
                   <button
                     type="button"
-                    className="btn-danger"
+                    className="btn-danger create-artist__remove-link-btn"
                     onClick={() => removeLink(idx)}
                     disabled={loading}
+                    aria-label={`Remove link ${link.label || `number ${idx + 1}`}`}
                   >
-                    ✕
+                    <IconTrash size={16} aria-hidden={true} />
                   </button>
                 </div>
               ))}
             </div>
+
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-secondary create-artist__add-link-btn"
               onClick={addLinkField}
-              style={{ alignSelf: 'flex-start', marginTop: 'var(--space-sm)' }}
               disabled={loading}
+              aria-label="Add another external link row"
             >
-              + Add Another Link
+              <IconPlus size={14} aria-hidden={true} />
+              <span>Add Another Link</span>
             </button>
           </div>
 
           {loading && (
-            <div className="progress-box">
-              <div className="progress-box__title">⏳ {statusText || 'Processing...'}</div>
-              <div className="progress-bar">
-                <div className="progress-bar__fill" style={{ width: '100%', animation: 'pulse 1.5s infinite' }} />
+            <div className="progress-box" role="status" aria-live="polite">
+              <div className="progress-box__title progress-box__title--icon">
+                <IconBolt size={20} aria-hidden={true} />
+                <span>{statusText || 'Processing profile archival...'}</span>
+              </div>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                aria-valuenow={50}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className="progress-bar__fill" style={{ width: '100%' }} />
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-md)', marginTop: 'var(--space-xl)' }}>
-            <Link to="/" className="btn-secondary" style={{ padding: 'var(--space-sm) var(--space-lg)' }}>
-              Cancel
+          <div className="create-artist__form-actions">
+            <Link to="/" className="btn-secondary create-artist__action-btn" aria-disabled={loading}>
+              <span>Cancel</span>
             </Link>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Creating...' : '✓ Save & Create Artist'}
+            <button type="submit" className="btn-primary create-artist__action-btn" disabled={loading}>
+              <IconCheck size={16} aria-hidden={true} />
+              <span>{loading ? 'Creating Profile...' : 'Save & Create Artist'}</span>
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

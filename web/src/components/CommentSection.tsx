@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Comment } from '../types/models';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { IconUser, IconWarning } from './Icons';
 
 interface Props {
   postId: string;
@@ -23,27 +24,28 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString();
 }
 
-function CommentItem({ comment }: { comment: Comment }) {
+// [P0 Fix] Wrap CommentItem in React.memo to prevent recursive virtual DOM re-render churn during textarea typing
+const CommentItem = React.memo(function CommentItem({ comment }: { comment: Comment }) {
   const isMember = comment.is_member || !!comment.user_id;
   const isAdmin = comment.author_role === 'admin';
 
   return (
-    <div className={`comment ${isMember ? 'comment-item--member' : ''}`}>
-      <div className="comment__header" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span className="comment__author" style={isMember ? { color: 'var(--accent)', fontWeight: '700' } : {}}>
+    <div className={`comment ${isMember ? 'comment-item--member' : ''}`} role="article" aria-label={`Comment by ${comment.author_name || 'Anonymous'}`}>
+      <div className="comment__header comment__header-row">
+        <span className={`comment__author ${isMember ? 'comment__author--member' : ''}`}>
           {comment.author_name}
         </span>
         {isAdmin ? (
-          <span className="member-badge" style={{ borderColor: '#ff6b6b', color: '#ff6b6b' }}>Admin</span>
+          <span className="member-badge member-badge--admin">Admin</span>
         ) : isMember ? (
           <span className="member-badge">Member</span>
         ) : null}
-        <span className="comment__date">{formatDate(comment.created_at)}</span>
+        <time className="comment__date" dateTime={comment.created_at}>{formatDate(comment.created_at)}</time>
         {comment.is_edited && <span className="comment__date">(edited)</span>}
       </div>
       <div className="comment__body">{comment.content}</div>
       {comment.replies && comment.replies.length > 0 && (
-        <div className="comment__replies">
+        <div className="comment__replies" role="group" aria-label={`Replies to ${comment.author_name || 'comment'}`}>
           {comment.replies.map((reply) => (
             <CommentItem key={reply.id} comment={reply} />
           ))}
@@ -51,16 +53,27 @@ function CommentItem({ comment }: { comment: Comment }) {
       )}
     </div>
   );
-}
+});
 
 export default function CommentSection({ postId, comments, onCommentAdded }: Props) {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!content.trim()) return;
 
     setSubmitting(true);
@@ -69,57 +82,95 @@ export default function CommentSection({ postId, comments, onCommentAdded }: Pro
         author_name: user ? (user.display_name || user.username) : (name.trim() || undefined),
         content: content.trim(),
       });
-      setContent('');
-      onCommentAdded();
-    } catch (err) {
+      if (isMountedRef.current) {
+        setContent('');
+        setError(null);
+        onCommentAdded();
+      }
+    } catch (err: unknown) {
       console.error('Failed to post comment:', err);
+      if (isMountedRef.current) {
+        setError((err as Error).message || 'Failed to post comment. Please check your connection and try again.');
+      }
     } finally {
-      setSubmitting(false);
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  }, [content, postId, user, name, onCommentAdded]);
 
   return (
-    <div className="comment-section">
-      <h3 className="comment-section__title">
+    <section className="comment-section" aria-labelledby="comment-section-title">
+      <h3 id="comment-section-title" className="comment-section__title">
         Comments ({comments.length})
       </h3>
 
-      <form className="comment-form" onSubmit={handleSubmit}>
+      {error && (
+        <div className="form-error" role="alert" aria-live="assertive">
+          <IconWarning size={18} aria-hidden={true} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form className="comment-form" onSubmit={handleSubmit} aria-busy={submitting}>
         {user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-sm)', color: 'var(--accent)', fontWeight: '600' }}>
-            <span>👤 Commenting as authenticated Member: <strong>{user.display_name || user.username}</strong></span>
+          <div className="comment-form__user-status">
+            <span className="comment-form__user-status-icon">
+              <IconUser size={16} aria-hidden={true} />
+              <span>Commenting as authenticated Member: <strong>{user.display_name || user.username}</strong></span>
+            </span>
             <span className="member-badge">Member</span>
           </div>
         ) : (
           <div className="comment-form__row">
+            <label htmlFor="comment-guest-name" className="sr-only">Your Name (optional)</label>
             <input
+              id="comment-guest-name"
               type="text"
               placeholder="Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={{ flex: 1 }}
+              className="comment-form__name-input"
+              disabled={submitting}
+              aria-label="Your Name (optional)"
             />
           </div>
         )}
-        <textarea
-          placeholder="Write a comment..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={submitting || !content.trim()}>
-          {submitting ? 'Posting...' : 'Post Comment'}
-        </button>
+
+        <div className="form-group">
+          <label htmlFor="comment-content" className="sr-only">Comment content (required)</label>
+          <textarea
+            id="comment-content"
+            placeholder="Write a comment..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            required
+            maxLength={2000}
+            disabled={submitting}
+            aria-label="Comment content (required)"
+            aria-invalid={!!error}
+          />
+        </div>
+
+        <div className="comment-form__footer">
+          <span className="comment-form__counter" aria-live="polite">
+            {content.length} / 2000 characters
+          </span>
+          <button type="submit" className="btn-primary" disabled={submitting || !content.trim()}>
+            {submitting ? 'Posting...' : 'Post Comment'}
+          </button>
+        </div>
       </form>
 
-      {comments.length === 0 ? (
-        <div className="empty-state">No comments yet</div>
-      ) : (
-        comments.map((comment) => (
-          <CommentItem key={comment.id} comment={comment} />
-        ))
-      )}
-    </div>
+      <div role="region" aria-label="Discussion thread">
+        {comments.length === 0 ? (
+          <div className="empty-state">No comments yet</div>
+        ) : (
+          comments.map((comment) => (
+            <CommentItem key={comment.id} comment={comment} />
+          ))
+        )}
+      </div>
+    </section>
   );
 }
-
