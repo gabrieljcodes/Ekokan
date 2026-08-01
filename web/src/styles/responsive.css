@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Ekokan Impeccable Design System — RESPONSIVE
+   ========================================================================== */
+
+/* ==================== Responsive ==================== */
+
+@media (max-width: 768px) {
+  .artist-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .post-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .artist-profile {
+    margin-top: -30px;
+  }
+  .artist-profile__avatar {
+    width: 70px;
+    height: 70px;
+  }
+  .artist-profile__row {
+    gap: var(--space-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .artist-profile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+  .artist-profile__row {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: var(--space-sm);
+  }
+  .artist-profile__name {
+    margin-bottom: 2px;
+  }
+  .artist-profile__row .btn-secondary--pill {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .post-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .post-header__artist-avatar {
+    width: 60px;
+    height: 60px;
+  }
+  .app-container {
+    padding: var(--space-md);
+  }
+
+  /* Action bar stacks on mobile */
+  .artist-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .artist-action-bar__search {
+    min-width: unset;
+    max-width: none;
+  }
+  .artist-action-bar__buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .artist-action-bar__buttons .btn-secondary,
+  .artist-action-bar__buttons .btn-primary {
+    justify-content: center;
+  }
+
+  /* Tag panels: reduce grid height, full-width search */
+  .tag-panel__grid {
+    max-height: 160px;
+  }
+  .tag-panel__search-input {
+    max-width: none;
+  }
+  .tag-panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tag-panel__header-actions {
+    width: 100%;
+  }
+  .tag-panel__sub-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+  .tag-panel__actions {
+    flex-direction: column;
+  }
+  .tag-panel__actions .btn-primary,
+  .tag-panel__actions .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* App header wrapping on mobile */
+  .app-header {
+    height: auto;
+    min-height: var(--header-height);
+    flex-wrap: wrap;
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+  .app-header__nav {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .app-header__divider {
+    display: none;
+  }
+  .app-footer {
+    flex-direction: column;
+    padding: var(--space-lg) var(--space-md);
+  }
+  .form-card__header--split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-artist__delete-btn {
+    justify-content: center;
+  }
+  .edit-artist__link-row {
+    flex-wrap: wrap;
+  }
+  .edit-artist__link-label {
+    width: 100%;
+  }
+  .edit-artist__form-actions {
+    flex-direction: column-reverse;
+  }
+  .edit-artist__action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .modal-card__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .modal-card__btn {
+    justify-content: center;
+    width: 100%;
+  }
+  .edit-post__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-post__delete-btn {
+    justify-content: center;
+  }
+  .edit-post__tag-create-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-post__tag-select {
+    width: 100%;
+  }
+  .edit-post__tag-create-btn {
+    justify-content: center;
+  }
+  .edit-post__attachment-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .edit-post__attachment-name-input {
+    max-width: 100%;
+  }
+  .edit-post__form-actions {
+    flex-direction: column-reverse;
+  }
+  .edit-post__action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

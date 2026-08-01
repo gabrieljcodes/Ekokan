@@ -1,0 +1,429 @@
+/* ==========================================================================
+   Ekokan Impeccable Design System — ARTIST
+   ========================================================================== */
+
+/* ==================== Artist Page ==================== */
+
+.artist-banner {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.artist-profile {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-md);
+  margin-top: -40px;
+  padding: 0 var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.artist-profile__avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--bg-primary);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.artist-profile__avatar--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--bg-elevated), rgba(139, 92, 246, 0.3));
+  border: 3px solid var(--border-focus);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.artist-profile__info {
+  padding-bottom: var(--space-sm);
+}
+
+.artist-profile__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.artist-profile__name {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  margin: 0;
+}
+
+.artist-profile__bio {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+  line-height: var(--lh-relaxed, 1.5);
+}
+
+.artist-profile-header {
+  position: relative;
+  width: 100%;
+}
+
+.artist-header-fav--active {
+  border-color: var(--brand-favorite) !important;
+  background: rgba(245, 158, 11, 0.16) !important;
+  color: var(--brand-favorite) !important;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.28);
+}
+.artist-header-fav--active:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.24) !important;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.38);
+}
+
+.artist-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+}
+
+.artist-tabs__tab {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  cursor: pointer;
+}
+.artist-tabs__tab:hover {
+  color: var(--text-primary);
+}
+.artist-tabs__tab--active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* Search bar */
+.search-bar {
+  position: relative;
+  margin-bottom: var(--space-lg);
+}
+.search-bar__icon {
+  position: absolute;
+  left: var(--space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+}
+.search-bar__input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-2xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.search-bar__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+
+/* ==================== Edit Artist Page & Form Token Classes ==================== */
+
+.form-card__header--split {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.edit-artist__delete-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-artist__required-mark {
+  color: var(--danger);
+}
+
+.edit-artist__readonly-hint {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+
+.edit-artist__readonly-input {
+  background-color: var(--bg-secondary);
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.edit-artist__current-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.edit-artist__current-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  flex-shrink: 0;
+}
+
+.edit-artist__current-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.edit-artist__current-subtitle {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.edit-artist__banner-container {
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.edit-artist__current-banner {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-artist__banner-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.edit-artist__banner-preview-thumb {
+  width: 140px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.edit-artist__links-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.edit-artist__link-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  width: 100%;
+}
+
+.edit-artist__link-label {
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.edit-artist__link-url {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-artist__add-link-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-artist__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.edit-artist__action-btn {
+  padding: var(--space-sm) var(--space-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+/* ==================== Create Artist Page & Shared Artist Form Tokens ==================== */
+.create-artist__title-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.create-artist__links-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.create-artist__link-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  width: 100%;
+}
+.create-artist__link-label {
+  width: 180px;
+  flex-shrink: 0;
+}
+.create-artist__link-url {
+  flex: 1;
+  min-width: 0;
+}
+.create-artist__add-link-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.create-artist__remove-link-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+.create-artist__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  flex-wrap: wrap;
+}
+.create-artist__action-btn {
+  padding: var(--space-sm) var(--space-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  min-height: 44px;
+}
+.create-artist__banner-thumb {
+  width: 140px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.create-artist__required-mark {
+  color: var(--danger);
+  margin-left: 4px;
+}
+.progress-box__title--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .edit-artist__link-row,
+  .create-artist__link-row {
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--bg-elevated);
+    padding: var(--space-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    gap: var(--space-xs);
+  }
+  .edit-artist__link-label,
+  .create-artist__link-label {
+    width: 100% !important;
+  }
+  .create-artist__remove-link-btn,
+  .edit-artist__delete-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .create-artist__form-actions,
+  .edit-artist__form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    width: 100%;
+  }
+  .create-artist__action-btn,
+  .edit-artist__action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+/* ==================== Artist Action Bar ==================== */
+
+.artist-action-bar {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+  margin-top: var(--space-sm);
+}
+.artist-action-bar__search {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+  max-width: 500px;
+}
+.artist-action-bar__buttons {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.artist-action-bar__buttons button,
+.artist-action-bar__buttons a {
+  transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1), background-color 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.artist-action-bar__buttons button:active:not(:disabled),
+.artist-action-bar__buttons a:active:not(:disabled) {
+  transform: scale(0.97);
+}
+

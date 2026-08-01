@@ -1,0 +1,142 @@
+/* ==========================================================================
+   Ekokan Impeccable Design System — A11Y-MOTION
+   ========================================================================== */
+
+/* ==================== Reduced Motion ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Preserve state-change feedback but remove motion */
+  .toast {
+    animation: none;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-confirm-box,
+  .admin-icon--spinning,
+  .profile-settings__tag-pill,
+  .api-tokens__success-box,
+  .api-tokens__roster-item,
+  .post-grid,
+  .tag-panel,
+  .user-dropdown__menu,
+  .modal-overlay,
+  .modal-card,
+  .motion-arrive-card,
+  .motion-arrive-row,
+  .progress-box,
+  .progress-bar__fill,
+  .edit-post__tag-check-animate,
+  .edit-post__media-card,
+  .edit-post__attachment-row,
+  .edit-post__progress-fill--animate {
+    animation: none !important;
+  }
+  .admin-toggle-btn,
+  .admin-action-btn,
+  .btn-secondary--pill,
+  .btn-secondary--toggle,
+  .api-tokens__roster-item,
+  .artist-action-bar__buttons button,
+  .artist-action-bar__buttons a,
+  .app-header__btn,
+  .user-menu-btn,
+  .user-menu__chevron,
+  .dropzone,
+  .dropzone__icon,
+  .edit-artist__delete-btn,
+  .edit-artist__add-link-btn,
+  .edit-artist__action-btn {
+    transition: none !important;
+  }
+  .admin-toggle-btn:active:not(:disabled),
+  .admin-action-btn:active:not(:disabled),
+  .btn-secondary--pill:active:not(:disabled),
+  .btn-secondary--toggle:active:not(:disabled),
+  .artist-action-bar__buttons button:active:not(:disabled),
+  .artist-action-bar__buttons a:active:not(:disabled),
+  .app-header__btn:active:not(:disabled),
+  .user-menu-btn:active:not(:disabled),
+  .user-menu-btn[aria-expanded="true"] .user-menu__chevron,
+  .dropzone:active:not(:disabled),
+  .dropzone:hover .dropzone__icon,
+  .dropzone:focus-within .dropzone__icon,
+  .edit-artist__delete-btn:active:not(:disabled),
+  .edit-artist__add-link-btn:active:not(:disabled),
+  .edit-artist__action-btn:active:not(:disabled),
+  .edit-post__delete-btn:active:not(:disabled),
+  .edit-post__tag-badge:active:not(:disabled),
+  .edit-post__media-card:hover,
+  .edit-post__attachment-row:hover,
+  .edit-post__remove-media-btn:active:not(:disabled),
+  .edit-post__action-btn:active:not(:disabled),
+  .post-header__action-btn:active:not(:disabled),
+  .post-nav__link:hover,
+  .app-header__logo:active,
+  .app-header__logo:hover .app-header__logo-icon {
+    transform: none !important;
+  }
+  .edit-post__delete-btn,
+  .edit-post__tag-badge,
+  .edit-post__media-card,
+  .edit-post__remove-media-btn,
+  .edit-post__attachment-row,
+  .edit-post__attachment-remove-btn,
+  .edit-post__progress-fill--animate,
+  .edit-post__file-upload,
+  .edit-post__file-upload::file-selector-button,
+  .edit-post__action-btn,
+  .post-nav__link,
+  .post-header__action-btn,
+  .post-header__artist-name,
+  .post-content-tabs__tab,
+  .app-header__logo,
+  .app-header__logo-icon,
+  .media-viewer__wrapper,
+  .media-viewer__zoom-overlay,
+  .lightbox-backdrop,
+  .lightbox-viewport,
+  .lightbox-header,
+  .lightbox-controls,
+  .lightbox-image,
+  .lightbox-btn,
+  .lightbox-btn--close,
+  .artist-card,
+  .post-card,
+  .favorites-tab-btn,
+  .loading-spinner,
+  .dashboard-loading-state,
+  .dashboard-error-card,
+  .dashboard-empty-card,
+  .fav-btn,
+  .fav-btn--active,
+  .auth-container,
+  .auth-submit-btn,
+  .auth-submit-btn__spinner,
+  .password-toggle-btn,
+  .artist-header-fav--active,
+  .create-post__tag-btn,
+  .create-artist__add-link-btn,
+  .create-artist__remove-link-btn,
+  .pagination__btn,
+  .attachment-item,
+  .attachment-item__name,
+  .attachment-item__download-btn,
+  .toast,
+  .toast__close-btn {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+
+
+

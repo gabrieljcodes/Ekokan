@@ -1,0 +1,274 @@
+/* ==========================================================================
+   Ekokan Impeccable Design System — LAYOUT
+   ========================================================================== */
+
+/* ==================== Layout ==================== */
+
+.app-header {
+  height: var(--header-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-lg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-header__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.app-header__logo:hover {
+  color: var(--text-primary);
+  opacity: 0.92;
+}
+.app-header__logo:active {
+  transform: scale(0.97);
+}
+
+.app-header__logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  transition: color var(--transition-fast), transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.app-header__logo:hover .app-header__logo-icon {
+  color: var(--accent-hover);
+  transform: rotate(-4deg) scale(1.06);
+}
+
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-left: auto;
+}
+
+.app-header__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+  text-decoration: none;
+}
+.app-header__link:hover {
+  color: var(--text-primary);
+}
+.app-header__link--favorites {
+  color: var(--brand-favorite);
+  font-weight: 600;
+}
+.app-header__link--favorites:hover {
+  color: var(--brand-favorite-hover);
+}
+.app-header__link--admin {
+  color: var(--accent);
+  font-weight: 700;
+}
+.app-header__link--admin:hover {
+  color: var(--accent-hover);
+}
+
+.app-header__user-group,
+.app-header__action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.app-header__user-group {
+  margin-left: var(--space-sm);
+}
+
+.app-header__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+.app-header__btn--register {
+  border-color: var(--accent);
+}
+
+.app-container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-lg);
+}
+
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  border-top: 1px solid var(--border-light);
+  margin-top: var(--space-2xl);
+}
+.app-footer__link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.app-footer__link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* ==================== Grid ==================== */
+
+.artist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+
+@keyframes grid-arrive {
+  0% {
+    opacity: 0.3;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.post-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-sm);
+  animation: grid-arrive 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+/* User pill and accessible dropdown in header */
+.user-dropdown-container {
+  position: relative;
+}
+
+@keyframes dropdown-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.user-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--bg-elevated);
+  padding: 6px 10px;
+  min-height: 36px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), background 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.user-menu-btn:hover,
+.user-menu-btn:focus-visible {
+  border-color: var(--border-focus);
+  background: var(--bg-card-hover);
+}
+.user-menu-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.user-menu__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-card);
+}
+
+.user-menu__name {
+  font-weight: 600;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-menu__chevron {
+  color: var(--text-muted);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.user-menu-btn[aria-expanded="true"] .user-menu__chevron {
+  transform: rotate(180deg);
+}
+
+.user-dropdown__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 230px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: var(--space-xs) 0;
+  z-index: 200;
+  transform-origin: top right;
+  animation: dropdown-arrive 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.user-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  min-height: 44px;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.user-dropdown__item:hover,
+.user-dropdown__item:focus-visible {
+  background-color: var(--bg-card-hover);
+  outline: none;
+}
+.user-dropdown__item--danger {
+  color: var(--danger);
+}
+.user-dropdown__item--danger:hover,
+.user-dropdown__item--danger:focus-visible {
+  background-color: rgba(224, 106, 106, 0.15);
+  color: var(--danger);
+}
+.user-dropdown__divider {
+  border-top: 1px solid var(--border-light);
+  margin: 4px 0;
+}
+

@@ -1,0 +1,72 @@
+/* ==========================================================================
+   Ekokan Impeccable Design System — TOKENS
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Colors — dark theme, Kemono-inspired */
+  --bg-primary: #121212;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #1e1e1e;
+  --bg-card-hover: #252525;
+  --bg-elevated: #2a2a2a;
+  --bg-input: #1e1e1e;
+
+  --border-color: #333;
+  --border-light: #2a2a2a;
+  --border-focus: #555;
+
+  --text-primary: #e0e0e0;
+  --text-secondary: #999;
+  --text-muted: #666;
+  --text-inverse: #121212;
+
+  --accent: #6aafe6;
+  --accent-hover: #89c4f4;
+  --accent-muted: rgba(106, 175, 230, 0.15);
+  --danger: #e06a6a;
+  --success: #6ae08a;
+  --warning: #e0c56a;
+  --brand-favorite: #ff5277;
+  --brand-favorite-hover: #ff7090;
+
+  /* Tag category colors */
+  --tag-general: #6aafe6;
+  --tag-character: #6ae0b0;
+  --tag-copyright: #c96ae0;
+  --tag-artist: #e0a86a;
+  --tag-meta: #999;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  --fs-xs: 0.7rem;
+  --fs-sm: 0.8rem;
+  --fs-base: 0.9rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.15rem;
+  --fs-xl: 1.4rem;
+  --fs-2xl: 1.8rem;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Layout */
+  --max-width: 1200px;
+  --header-height: 52px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}
+
