@@ -56,6 +56,18 @@ export function IconSearch(props: IconProps = {}) {
   return svg(props, 'M11 17.25a6.25 6.25 0 1 1 0-12.5 6.25 6.25 0 0 1 0 12.5z', 'M16 16l4.5 4.5');
 }
 
+export function IconMinus(props: IconProps = {}) {
+  return svg(props, 'M5 12h14');
+}
+
+export function IconZoomIn(props: IconProps = {}) {
+  return svg(props, 'M11 17.25a6.25 6.25 0 1 1 0-12.5 6.25 6.25 0 0 1 0 12.5z', 'M16 16l4.5 4.5', 'M11 8v6', 'M8 11h6');
+}
+
+export function IconZoomOut(props: IconProps = {}) {
+  return svg(props, 'M11 17.25a6.25 6.25 0 1 1 0-12.5 6.25 6.25 0 0 1 0 12.5z', 'M16 16l4.5 4.5', 'M8 11h6');
+}
+
 export function IconUpload(props: IconProps = {}) {
   return svg(props, 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12');
 }
