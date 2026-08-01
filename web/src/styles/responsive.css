@@ -85,9 +85,10 @@
     max-height: 180px;
     gap: 8px;
   }
-  .tag-panel__grid button.tag-badge {
-    min-height: 38px;
-    padding: 6px 12px;
+  .tag-panel__grid button.tag-badge,
+  .tag-panel__grid button.tag-pill {
+    min-height: 40px;
+    padding: 8px 14px;
   }
   .tag-panel__search-input {
     max-width: none;
@@ -130,9 +131,11 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .tag-panel__actions {
+  .tag-panel__actions,
+  .tag-panel__confirm-group {
     flex-direction: column;
     align-items: stretch;
+    width: 100%;
   }
   .tag-panel__link {
     min-height: 44px;

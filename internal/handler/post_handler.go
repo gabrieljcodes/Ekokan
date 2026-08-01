@@ -426,3 +426,43 @@ func (h *PostHandler) MassTag(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
+
+type MassDeleteRequest struct {
+	PostIDs []uuid.UUID `json:"post_ids"`
+}
+
+func (h *PostHandler) MassDelete(w http.ResponseWriter, r *http.Request) {
+	var req MassDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if len(req.PostIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "post_ids cannot be empty")
+		return
+	}
+
+	for _, id := range req.PostIDs {
+		if !h.checkPostOwnership(w, r, id) {
+			return
+		}
+	}
+
+	deleted, err := h.posts.MassDelete(r.Context(), req.PostIDs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Trigger asynchronous storage cleaning to wipe orphaned S3 / local files immediately
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		_, _ = h.files.DeleteOrphaned(ctx)
+	}()
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"deleted": deleted,
+	})
+}

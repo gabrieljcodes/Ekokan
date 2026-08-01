@@ -113,6 +113,12 @@ export const api = {
       body: JSON.stringify({ post_ids: postIds, tag_ids: tagIds, action }),
     }),
 
+  massDeletePosts: (postIds: string[]) =>
+    request<{ status: string; deleted: number }>('/api/posts/mass-delete', {
+      method: 'POST',
+      body: JSON.stringify({ post_ids: postIds }),
+    }),
+
   // Media
   uploadMedia: (postId: string, file: globalThis.File, caption = '') =>
     uploadFile<PostMedia>(`/api/posts/${postId}/media`, file, { caption }),

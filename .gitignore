@@ -30,6 +30,7 @@ web/.vite/
 .agents/
 .claude/
 .impeccable/
+PRODUCT.md
 .cursor/
 .cursorrules
 .aider*

@@ -9,7 +9,8 @@ import { toast } from '../components/Toast';
 import ArtistProfileHeader from '../components/ArtistProfileHeader';
 import TagFilterPanel from '../components/TagFilterPanel';
 import MassTagPanel from '../components/MassTagPanel';
-import { IconSearch, IconFilter, IconTag, IconPlus, IconUpload, IconArrowLeft } from '../components/Icons';
+import MassDeletePanel from '../components/MassDeletePanel';
+import { IconSearch, IconFilter, IconTag, IconTrash, IconPlus, IconUpload, IconArrowLeft } from '../components/Icons';
 
 export default function ArtistPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -43,6 +44,12 @@ export default function ArtistPage() {
   const [tagSearch, setTagSearch] = useState('');
   const [taggingStatus, setTaggingStatus] = useState<string | null>(null);
   const [taggingLoading, setTaggingLoading] = useState(false);
+
+  // Mass Deleting State
+  const [isMassDeleting, setIsMassDeleting] = useState(false);
+  const [deletingLoading, setDeletingLoading] = useState(false);
+  const [deletingStatus, setDeletingStatus] = useState<string | null>(null);
+  const [deletingError, setDeletingError] = useState<string | null>(null);
 
   // Non-persistent Tag Filtering State
   const [isFiltering, setIsFiltering] = useState(false);
@@ -167,6 +174,40 @@ export default function ArtistPage() {
     }
   };
 
+  const executeMassDelete = async () => {
+    if (selectedPostIds.size === 0) {
+      toast('Please select at least one post to delete.', 'error');
+      return;
+    }
+    if (!user) {
+      toast('You must be logged in to delete posts.', 'error');
+      return;
+    }
+    setDeletingLoading(true);
+    setDeletingStatus(null);
+    setDeletingError(null);
+    try {
+      const ids = Array.from(selectedPostIds);
+      const res = await api.massDeletePosts(ids);
+      const msg = `Successfully deleted ${res.deleted || ids.length} post(s) and cleaned storage media!`;
+      setDeletingStatus(msg);
+      toast(msg, 'success');
+      setSelectedPostIds(new Set());
+      if (slug) {
+        const combinedExcluded = Array.from(new Set([...Array.from(excludedTagIds || []), ...Array.from(filterExcludeTagIds)]));
+        const refetched = await api.listArtistPosts(slug, page, 25, search, Array.from(filterIncludeTagIds), combinedExcluded);
+        setPosts(refetched);
+      }
+      setTimeout(() => setDeletingStatus(null), 6000);
+    } catch (err: any) {
+      const errMsg = 'Error during mass deletion: ' + (err.message || err);
+      setDeletingError(errMsg);
+      toast(errMsg, 'error');
+    } finally {
+      setDeletingLoading(false);
+    }
+  };
+
   const handleToggleFavorite = async () => {
     if (!user) {
       toast('Please login to favorite creators', 'info');
@@ -228,8 +269,13 @@ export default function ArtistPage() {
             <button
               type="button"
               onClick={() => {
-                setIsFiltering(!isFiltering);
-                if (!isFiltering) setIsMassTagging(false);
+                const next = !isFiltering;
+                setIsFiltering(next);
+                if (next) {
+                  setIsMassTagging(false);
+                  setIsMassDeleting(false);
+                  setSelectedPostIds(new Set());
+                }
               }}
               className="btn-secondary btn-secondary--toggle"
               aria-pressed={isFiltering}
@@ -240,15 +286,40 @@ export default function ArtistPage() {
             <button
               type="button"
               onClick={() => {
-                setIsMassTagging(!isMassTagging);
-                if (!isMassTagging) setIsFiltering(false);
+                const next = !isMassTagging;
+                setIsMassTagging(next);
+                if (next) {
+                  setIsFiltering(false);
+                  setIsMassDeleting(false);
+                  setSelectedPostIds(new Set());
+                }
                 setTaggingStatus(null);
               }}
               className="btn-secondary btn-secondary--toggle"
               aria-pressed={isMassTagging}
             >
               <IconTag size={14} />
-              Mass Tag Mode {selectedPostIds.size > 0 ? `(${selectedPostIds.size})` : ''}
+              Mass Tag Mode {selectedPostIds.size > 0 && isMassTagging ? `(${selectedPostIds.size})` : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isMassDeleting;
+                setIsMassDeleting(next);
+                if (next) {
+                  setIsFiltering(false);
+                  setIsMassTagging(false);
+                  setSelectedPostIds(new Set());
+                }
+                setDeletingStatus(null);
+                setDeletingError(null);
+              }}
+              className="btn-secondary btn-secondary--toggle"
+              style={isMassDeleting ? { borderColor: 'var(--danger)', color: 'var(--danger)' } : undefined}
+              aria-pressed={isMassDeleting}
+            >
+              <IconTrash size={14} />
+              Mass Delete Mode {selectedPostIds.size > 0 && isMassDeleting ? `(${selectedPostIds.size})` : ''}
             </button>
             <Link to={`/posts/new?artist=${artist.slug}`} className="btn-primary">
               <IconPlus size={14} /> Upload Post for {artist.name}
@@ -291,6 +362,21 @@ export default function ArtistPage() {
           />
         )}
 
+        {/* Mass Deletion Controls */}
+        {isMassDeleting && (
+          <MassDeletePanel
+            selectedPostCount={selectedPostIds.size}
+            currentPagePostCount={posts?.data?.length || 0}
+            deletingLoading={deletingLoading}
+            deletingStatus={deletingStatus}
+            deletingError={deletingError}
+            onSelectPage={handleSelectCurrentPage}
+            onDeselectPage={handleDeselectCurrentPage}
+            onClearSelection={() => setSelectedPostIds(new Set())}
+            onDeleteSelected={executeMassDelete}
+          />
+        )}
+
         {/* Posts Grid */}
         {postsLoading || !posts ? (
           <div className="loading" role="status" aria-live="polite">
@@ -305,7 +391,7 @@ export default function ArtistPage() {
                   key={post.id}
                   post={post}
                   artistSlug={artist.slug}
-                  selectable={isMassTagging}
+                  selectable={isMassTagging || isMassDeleting}
                   selected={selectedPostIds.has(post.id)}
                   onToggleSelect={handleTogglePostSelect}
                 />

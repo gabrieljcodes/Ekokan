@@ -315,6 +315,15 @@ func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// MassDelete removes multiple posts in a single atomic SQL query
+func (r *PostRepo) MassDelete(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM posts WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return 0, fmt.Errorf("mass deleting posts: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 func (r *PostRepo) ListByTag(ctx context.Context, tagID uuid.UUID, params models.PaginationParams) (*models.PaginatedResult[models.Post], error) {
 	var total int
 	if err := r.pool.QueryRow(ctx,
