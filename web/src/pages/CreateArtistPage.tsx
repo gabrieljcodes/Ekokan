@@ -258,17 +258,17 @@ export default function CreateArtistPage() {
                 <input
                   id="create-avatar-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
                   className="dropzone__input"
                   onChange={handleAvatarSelect}
                   disabled={loading}
-                  aria-label="Upload artist avatar image (PNG, JPG, WebP supported)"
+                  aria-label="Upload artist avatar image (PNG, JPG, WebP & animated GIF supported)"
                 />
                 <div className="dropzone__icon" aria-hidden="true">
                   <IconImage size={40} />
                 </div>
                 <div className="dropzone__text">Click or drag an image here to upload avatar</div>
-                <div className="dropzone__subtext">PNG, JPG, WebP supported (Max 50MB)</div>
+                <div className="dropzone__subtext">PNG, JPG, WebP & animated GIF supported (Max 50MB)</div>
               </div>
             ) : (
               <div className="file-preview-item motion-arrive-row">
@@ -304,11 +304,11 @@ export default function CreateArtistPage() {
                 <input
                   id="create-banner-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
                   className="dropzone__input"
                   onChange={handleBannerSelect}
                   disabled={loading}
-                  aria-label="Upload artist cover banner illustration (Large widescreen illustrations recommended)"
+                  aria-label="Upload artist cover banner illustration (Large widescreen illustrations or GIF supported)"
                 />
                 <div className="dropzone__icon" aria-hidden="true">
                   <IconImage size={42} />

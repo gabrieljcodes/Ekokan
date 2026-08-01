@@ -297,9 +297,9 @@ export default function EditArtistPage() {
                 <input
                   id="avatar-upload-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
                   className="dropzone__input"
-                  aria-label="Upload new artist avatar image"
+                  aria-label="Upload new artist avatar image (including animated GIF)"
                   onChange={(e) => e.target.files?.[0] && setAvatarFile(e.target.files[0])}
                   disabled={loading}
                 />
@@ -307,7 +307,7 @@ export default function EditArtistPage() {
                   <IconImage size={28} />
                 </div>
                 <div className="dropzone__text">Click or drag an image here to upload new avatar</div>
-                <div className="dropzone__subtext">PNG, JPG, WebP supported</div>
+                <div className="dropzone__subtext">PNG, JPG, WebP & animated GIF supported</div>
               </div>
             ) : (
               <div className="file-preview-item motion-arrive-card">
@@ -349,7 +349,7 @@ export default function EditArtistPage() {
                 <input
                   id="banner-upload-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
                   className="dropzone__input"
                   aria-label="Upload new profile cover banner"
                   onChange={(e) => e.target.files?.[0] && setBannerFile(e.target.files[0])}

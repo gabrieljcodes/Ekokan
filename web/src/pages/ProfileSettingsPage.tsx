@@ -5,6 +5,64 @@ import type { ApiToken, Tag } from '../types/models';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { IconUser, IconWarning, IconCheck, IconPlus, IconTrash, IconBan, IconCopy, IconRefresh, IconKey } from '../components/Icons';
 
+interface TokenItemProps {
+  token: ApiToken;
+  onRevoke: (id: string) => void;
+}
+
+const TokenListItem = React.memo(function TokenListItem({ token, onRevoke }: TokenItemProps) {
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  return (
+    <div className="profile-settings__token-item motion-arrive-row">
+      <div>
+        <div className="profile-settings__token-name">
+          {token.name}
+        </div>
+        <div className="profile-settings__token-meta">
+          <span>Prefix: <code>{token.token_prefix}...</code></span>
+          <span>Created: {new Date(token.created_at).toLocaleDateString()}</span>
+          <span>Last used: {token.last_used_at ? new Date(token.last_used_at).toLocaleString() : 'Never'}</span>
+        </div>
+      </div>
+      <div className="profile-settings__token-actions">
+        {!isConfirming ? (
+          <button
+            type="button"
+            onClick={() => setIsConfirming(true)}
+            className="btn-danger"
+            title={`Revoke token ${token.name}`}
+            aria-label={`Revoke automation token ${token.name}`}
+          >
+            <IconTrash size={16} aria-hidden={true} />
+            <span>Revoke</span>
+          </button>
+        ) : (
+          <div className="profile-settings__token-confirm-group" role="group" aria-label="Confirm token revocation">
+            <span className="profile-settings__confirm-notice">Revoke immediately?</span>
+            <button
+              type="button"
+              onClick={() => onRevoke(token.id)}
+              className="btn-danger"
+              title="Confirm permanent revocation"
+            >
+              <IconTrash size={14} aria-hidden={true} />
+              <span>Confirm Revocation</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsConfirming(false)}
+              className="btn-secondary"
+            >
+              <span>Cancel</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export default function ProfileSettingsPage() {
   const { user, excludedTagIds, saveExcludedTags, updateUserAvatar } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -178,10 +236,7 @@ export default function ProfileSettingsPage() {
     }
   }, [newTokenName]);
 
-  const handleRevokeToken = useCallback(async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to permanently revoke token "${name}"? Any automation tools using it will lose access immediately.`)) {
-      return;
-    }
+  const handleRevokeToken = useCallback(async (id: string) => {
     setTokenError('');
     try {
       await api.deleteApiToken(id);
@@ -227,7 +282,7 @@ export default function ProfileSettingsPage() {
         </p>
       </header>
 
-      {/* Accessible WAI-ARIA Navigation Tabs */}
+      {/* Accessible WAI-ARIA Navigation Tabs with Roving TabIndex */}
       <nav aria-label="Account Settings Sections">
         <div className="artist-tabs" role="tablist" aria-label="Settings configuration tabs">
           <button
@@ -236,6 +291,7 @@ export default function ProfileSettingsPage() {
             role="tab"
             aria-selected={activeTab === 'profile'}
             aria-controls="panel-profile"
+            tabIndex={activeTab === 'profile' ? 0 : -1}
             className={`artist-tabs__tab ${activeTab === 'profile' ? 'artist-tabs__tab--active' : ''}`}
             onClick={() => setSearchParams({ tab: 'profile' })}
           >
@@ -247,6 +303,7 @@ export default function ProfileSettingsPage() {
             role="tab"
             aria-selected={activeTab === 'tags'}
             aria-controls="panel-tags"
+            tabIndex={activeTab === 'tags' ? 0 : -1}
             className={`artist-tabs__tab ${activeTab === 'tags' ? 'artist-tabs__tab--active' : ''}`}
             onClick={() => setSearchParams({ tab: 'tags' })}
           >
@@ -258,6 +315,7 @@ export default function ProfileSettingsPage() {
             role="tab"
             aria-selected={activeTab === 'tokens'}
             aria-controls="panel-tokens"
+            tabIndex={activeTab === 'tokens' ? 0 : -1}
             className={`artist-tabs__tab ${activeTab === 'tokens' ? 'artist-tabs__tab--active' : ''}`}
             onClick={() => setSearchParams({ tab: 'tokens' })}
           >
@@ -312,12 +370,12 @@ export default function ProfileSettingsPage() {
                 {user.display_name || user.username}
               </div>
               <div className="profile-settings__user-meta">
-                Username: <strong>@{user.username}</strong> &bull; Role: <strong className="profile-settings__role-accent">{user.role}</strong>
+                Username: <strong>@{user.username}</strong> &bull; Role: <strong className="profile-settings__role-accent">{user.role}</strong> &bull; <em>Supports PNG, JPG, WebP &amp; animated GIF</em>
               </div>
 
               <label
                 htmlFor="avatar-upload-input"
-                className={`btn-secondary profile-settings__avatar-btn ${uploadingAvatar ? 'profile-settings__avatar-btn--waiting' : ''}`}
+                className={`btn-primary profile-settings__avatar-btn ${uploadingAvatar ? 'profile-settings__avatar-btn--waiting' : ''}`}
               >
                 {uploadingAvatar ? (
                   <>
@@ -334,11 +392,11 @@ export default function ProfileSettingsPage() {
               <input
                 id="avatar-upload-input"
                 type="file"
-                accept="image/*"
+                accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
                 onChange={handleAvatarChange}
                 disabled={uploadingAvatar}
                 className="sr-only"
-                aria-label="Upload new profile avatar illustration image"
+                aria-label="Upload new profile avatar illustration image (PNG, JPG, WebP, or animated GIF)"
               />
             </div>
           </div>
@@ -533,28 +591,7 @@ export default function ProfileSettingsPage() {
           ) : (
             <div className="profile-settings__token-list" role="region" aria-label="Active API token roster">
               {tokens.map((t) => (
-                <div key={t.id} className="profile-settings__token-item motion-arrive-row">
-                  <div>
-                    <div className="profile-settings__token-name">
-                      {t.name}
-                    </div>
-                    <div className="profile-settings__token-meta">
-                      <span>Prefix: <code>{t.token_prefix}...</code></span>
-                      <span>Created: {new Date(t.created_at).toLocaleDateString()}</span>
-                      <span>Last used: {t.last_used_at ? new Date(t.last_used_at).toLocaleString() : 'Never'}</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRevokeToken(t.id, t.name)}
-                    className="btn-danger"
-                    title={`Revoke token ${t.name}`}
-                    aria-label={`Revoke automation token ${t.name}`}
-                  >
-                    <IconTrash size={16} aria-hidden={true} />
-                    <span>Revoke</span>
-                  </button>
-                </div>
+                <TokenListItem key={t.id} token={t} onRevoke={handleRevokeToken} />
               ))}
             </div>
           )}

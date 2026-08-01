@@ -64,7 +64,8 @@
 .text-danger { color: var(--danger); }
 
 /* Visually hidden — accessible to screen readers only */
-.visually-hidden {
+.visually-hidden,
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;

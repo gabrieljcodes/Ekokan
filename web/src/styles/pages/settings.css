@@ -527,7 +527,10 @@
   font-size: var(--fs-xs);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }
 
 .profile-settings__avatar-btn--waiting {
@@ -715,6 +718,23 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.profile-settings__token-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.profile-settings__token-confirm-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+.profile-settings__confirm-notice {
+  font-size: var(--fs-xs);
+  color: var(--danger);
+  font-weight: 600;
+  margin-right: var(--space-xs);
+}
 
 @media (max-width: 480px) {
   .profile-settings__avatar-row {
@@ -724,7 +744,9 @@
   }
   .profile-settings__token-item,
   .profile-settings__token-copy-row,
-  .profile-settings__tags-actions {
+  .profile-settings__tags-actions,
+  .profile-settings__token-actions,
+  .profile-settings__token-confirm-group {
     flex-direction: column;
     align-items: stretch;
   }
