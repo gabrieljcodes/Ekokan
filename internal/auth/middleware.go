@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,12 @@ type ApiTokenValidator interface {
 	ValidateApiToken(ctx context.Context, token string) (*Claims, error)
 }
 
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 func validateTokenOrApi(ctx context.Context, secret, token string, validator ApiTokenValidator) (*Claims, error) {
 	if strings.HasPrefix(token, "eko_") && validator != nil {
 		return validator.ValidateApiToken(ctx, token)
@@ -28,12 +35,12 @@ func RequireAuth(secret string, validator ApiTokenValidator) func(http.Handler) 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
 			if token == "" {
-				http.Error(w, `{"error":"unauthorized: missing token"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized: missing token")
 				return
 			}
 			claims, err := validateTokenOrApi(r.Context(), secret, token, validator)
 			if err != nil {
-				http.Error(w, `{"error":"unauthorized: `+err.Error()+`"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
 				return
 			}
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
@@ -47,18 +54,18 @@ func RequireAdmin(secret string, validator ApiTokenValidator) func(http.Handler)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
 			if token == "" {
-				http.Error(w, `{"error":"unauthorized: missing token"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized: missing token")
 				return
 			}
 			claims, err := validateTokenOrApi(r.Context(), secret, token, validator)
 			if err != nil {
-				http.Error(w, `{"error":"unauthorized: `+err.Error()+`"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
 				return
 			}
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
 			r = r.WithContext(ctx)
 			if !IsAdmin(r) {
-				http.Error(w, `{"error":"forbidden: admin token required"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden: admin token required")
 				return
 			}
 			next.ServeHTTP(w, r)
