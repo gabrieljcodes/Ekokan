@@ -14,8 +14,8 @@ import (
 // StartThumbnailWorker runs as a high-performance multi-threaded background pool to backfill
 // thumbnails in storage/CDN for all existing files imported before the thumbnail system was enabled.
 func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
-	// Give the HTTP server a few seconds to finish initializing before scanning
-	time.Sleep(5 * time.Second)
+	// Give the HTTP server and storage enough time to initialize before scanning
+	time.Sleep(15 * time.Second)
 
 	slog.Info("thumbnail background worker started: scanning database to generate missing media thumbnails")
 	ctx := context.Background()
@@ -41,10 +41,10 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 	rows.Close()
 
 	totalFiles := len(items)
-	const numWorkers = 12 // Concurrency limit (multithreading) for parallel network IO and thumbnail computation
+	const numWorkers = 2 // Concurrency limit kept low to prevent OpenDAL FFI thread starvation and memory saturation
 	slog.Info("thumbnail worker: starting concurrent scan in storage", "total_files", totalFiles, "concurrency_workers", numWorkers)
 
-	itemChan := make(chan fileItem, numWorkers*2)
+	itemChan := make(chan fileItem, numWorkers*4)
 	var generatedCount int32
 	var wg sync.WaitGroup
 
@@ -54,6 +54,9 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 		go func(workerID int) {
 			defer wg.Done()
 			for item := range itemChan {
+				// Gentle pacing yield to avoid blocking Go scheduler / FFI operations during active user HTTP uploads
+				time.Sleep(100 * time.Millisecond)
+
 				thumbPath := item.Path + ".thumb.jpg"
 				exists, err := store.Exists(ctx, thumbPath)
 				if err != nil {
