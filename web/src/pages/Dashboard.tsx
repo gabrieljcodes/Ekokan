@@ -40,7 +40,6 @@ export default function Dashboard() {
   // Fetch artist archive catalog with out-of-order race condition guard
   const fetchCatalog = useCallback((targetPage: number, targetQuery: string) => {
     setLoading(true);
-    setError(null);
     let ignore = false;
 
     api.listArtists(targetPage, 50, targetQuery)

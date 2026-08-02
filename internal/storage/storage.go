@@ -84,19 +84,47 @@ func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 	}, nil
 }
 
-func (s *OpenDALStore) Put(_ context.Context, key string, data []byte) error {
+// ffiSem limits concurrent OpenDAL FFI executions across all workers to prevent thread starvation
+// and Go runtime CPU blocking during high-concurrency bulk imports.
+var ffiSem = make(chan struct{}, 3)
+
+func (s *OpenDALStore) Put(ctx context.Context, key string, data []byte) error {
+	select {
+	case ffiSem <- struct{}{}:
+		defer func() { <-ffiSem }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return s.op.Write(key, data)
 }
 
-func (s *OpenDALStore) Get(_ context.Context, key string) ([]byte, error) {
+func (s *OpenDALStore) Get(ctx context.Context, key string) ([]byte, error) {
+	select {
+	case ffiSem <- struct{}{}:
+		defer func() { <-ffiSem }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	return s.op.Read(key)
 }
 
-func (s *OpenDALStore) Delete(_ context.Context, key string) error {
+func (s *OpenDALStore) Delete(ctx context.Context, key string) error {
+	select {
+	case ffiSem <- struct{}{}:
+		defer func() { <-ffiSem }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return s.op.Delete(key)
 }
 
-func (s *OpenDALStore) Exists(_ context.Context, key string) (bool, error) {
+func (s *OpenDALStore) Exists(ctx context.Context, key string) (bool, error) {
+	select {
+	case ffiSem <- struct{}{}:
+		defer func() { <-ffiSem }()
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
 	_, err := s.op.Stat(key)
 	if err == nil {
 		return true, nil

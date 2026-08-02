@@ -19,19 +19,10 @@ import (
 	xdraw "golang.org/x/image/draw"
 )
 
-// thumbnailSem limits active thumbnail generation tasks globally to prevent OOM spikes and CPU saturation.
-var thumbnailSem = make(chan struct{}, 3)
-
 // GenerateThumbnail creates a lightweight JPEG thumbnail (max dimension 450px)
 // from image data (JPEG/PNG/GIF/WebP) or video files (MP4/WebM/etc via ffmpeg).
+// Concurrency is bounded by ffiSem in storage.go which gates all OpenDAL I/O.
 func GenerateThumbnail(ctx context.Context, data []byte, filename string) ([]byte, error) {
-	select {
-	case thumbnailSem <- struct{}{}:
-		defer func() { <-thumbnailSem }()
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-
 	ext := strings.ToLower(filepath.Ext(filename))
 
 	// Determine if file is a known video format

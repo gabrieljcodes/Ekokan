@@ -20,8 +20,10 @@ import (
 )
 
 type tokenCacheEntry struct {
-	claims   *auth.Claims
-	cachedAt time.Time
+	claims      *auth.Claims
+	cachedAt    time.Time
+	tokenID     uuid.UUID
+	lastUpdated time.Time // tracks when last_used_at was last written to DB
 }
 
 type ApiTokenRepo struct {
@@ -148,20 +150,33 @@ func (r *ApiTokenRepo) ValidateApiToken(ctx context.Context, token string) (*aut
 		return nil, errors.New("user account is deactivated")
 	}
 
-	go func() {
-		ctxTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_, _ = r.pool.Exec(ctxTimeout, `UPDATE api_tokens SET last_used_at = NOW() WHERE id = $1`, tokenID)
-	}()
-
-	claims.ExpiresAt = time.Now().Add(365 * 24 * time.Hour).Unix()
-
+	// Debounce last_used_at: update at most once per token per minute
 	r.mu.Lock()
+	entry := r.cache[hashStr]
+	needsUsageUpdate := time.Since(entry.lastUpdated) > 1*time.Minute || entry.lastUpdated.IsZero()
+	now := time.Now()
 	r.cache[hashStr] = tokenCacheEntry{
-		claims:   &claims,
-		cachedAt: time.Now(),
+		claims:      &claims,
+		cachedAt:    now,
+		tokenID:     tokenID,
+		lastUpdated: entry.lastUpdated,
+	}
+	if needsUsageUpdate {
+		// Mark updated before releasing lock to prevent concurrent goroutines
+		updated := r.cache[hashStr]
+		updated.lastUpdated = now
+		r.cache[hashStr] = updated
 	}
 	r.mu.Unlock()
 
+	if needsUsageUpdate {
+		go func() {
+			ctxTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, _ = r.pool.Exec(ctxTimeout, `UPDATE api_tokens SET last_used_at = NOW() WHERE id = $1`, tokenID)
+		}()
+	}
+
+	claims.ExpiresAt = time.Now().Add(365 * 24 * time.Hour).Unix()
 	return &claims, nil
 }

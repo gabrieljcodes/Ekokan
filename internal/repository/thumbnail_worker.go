@@ -41,7 +41,7 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 	rows.Close()
 
 	totalFiles := len(items)
-	const numWorkers = 2 // Concurrency limit kept low to prevent OpenDAL FFI thread starvation and memory saturation
+	const numWorkers = 4 // Concurrency bounded by ffiSem in storage.go; workers can safely be higher
 	slog.Info("thumbnail worker: starting concurrent scan in storage", "total_files", totalFiles, "concurrency_workers", numWorkers)
 
 	itemChan := make(chan fileItem, numWorkers*4)
@@ -54,9 +54,6 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 		go func(workerID int) {
 			defer wg.Done()
 			for item := range itemChan {
-				// Gentle pacing yield to avoid blocking Go scheduler / FFI operations during active user HTTP uploads
-				time.Sleep(100 * time.Millisecond)
-
 				thumbPath := item.Path + ".thumb.jpg"
 				exists, err := store.Exists(ctx, thumbPath)
 				if err != nil {
