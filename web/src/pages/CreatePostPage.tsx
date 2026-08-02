@@ -310,9 +310,11 @@ export default function CreatePostPage() {
           <div className="form-group">
             <div className="create-post__label-row">
               <label htmlFor="create-artist-select" className="form-label">
-                <span>Artist / Creator</span>
-                <span className="create-post__required-mark" aria-hidden="true">*</span>
-                <span className="sr-only">(Required)</span>
+                <span className="form-label__title">
+                  <span>Artist / Creator</span>
+                  <span className="create-post__required-mark" aria-hidden="true">*</span>
+                  <span className="sr-only">(Required)</span>
+                </span>
               </label>
               <Link to="/artists/new" className="create-post__label-link">
                 <IconPlus size={14} aria-hidden={true} />
@@ -345,9 +347,11 @@ export default function CreatePostPage() {
           {/* Title */}
           <div className="form-group">
             <label htmlFor="create-title-input" className="form-label">
-              <span>Post Title</span>
-              <span className="create-post__required-mark" aria-hidden="true">*</span>
-              <span className="sr-only">(Required)</span>
+              <span className="form-label__title">
+                <span>Post Title</span>
+                <span className="create-post__required-mark" aria-hidden="true">*</span>
+                <span className="sr-only">(Required)</span>
+              </span>
             </label>
             <input
               id="create-title-input"
@@ -363,9 +367,11 @@ export default function CreatePostPage() {
           {/* Slug */}
           <div className="form-group">
             <label htmlFor="create-slug-input" className="form-label">
-              <span>URL Slug</span>
-              <span className="create-post__required-mark" aria-hidden="true">*</span>
-              <span className="sr-only">(Required)</span>
+              <span className="form-label__title">
+                <span>URL Slug</span>
+                <span className="create-post__required-mark" aria-hidden="true">*</span>
+                <span className="sr-only">(Required)</span>
+              </span>
               <span className="form-label__hint">Auto-generated identifier</span>
             </label>
             <input

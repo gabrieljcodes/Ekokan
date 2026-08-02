@@ -229,8 +229,10 @@ export default function EditArtistPage() {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label" htmlFor="artist-name">
-              <span>Artist Name</span>
-              <span className="edit-artist__required-mark">*</span>
+              <span className="form-label__title">
+                <span>Artist Name</span>
+                <span className="edit-artist__required-mark">*</span>
+              </span>
             </label>
             <input
               id="artist-name"

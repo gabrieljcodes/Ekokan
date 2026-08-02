@@ -14,9 +14,9 @@
 
 .artist-profile {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-md);
-  margin-top: -40px;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  margin-top: 0;
   padding: 0 var(--space-lg);
   margin-bottom: var(--space-lg);
 }
@@ -29,6 +29,7 @@
   border: 3px solid var(--bg-primary);
   background: var(--bg-elevated);
   flex-shrink: 0;
+  margin-top: -40px;
 }
 
 .artist-profile__avatar--placeholder {
@@ -45,13 +46,24 @@
 }
 
 .artist-profile__info {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-sm);
   padding-bottom: var(--space-sm);
 }
 
 .artist-profile__row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.artist-profile__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 

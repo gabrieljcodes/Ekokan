@@ -29,7 +29,8 @@
     align-items: flex-start;
     gap: var(--space-sm);
   }
-  .artist-profile__row {
+  .artist-profile__row,
+  .artist-profile__actions {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
@@ -38,7 +39,8 @@
   .artist-profile__name {
     margin-bottom: 2px;
   }
-  .artist-profile__row .btn-secondary--pill {
+  .artist-profile__row .btn-secondary--pill,
+  .artist-profile__actions .btn-secondary--pill {
     min-height: 44px;
     display: inline-flex;
     align-items: center;

@@ -67,31 +67,32 @@ const ArtistProfileHeader: React.FC<Props> = React.memo(({ artist, favorited, on
         <div className="artist-profile__info">
           <div className="artist-profile__row">
             <h1 className="artist-profile__name">{artist.name}</h1>
-            
-            <button
-              type="button"
-              onClick={onToggleFavorite}
-              className={`btn-secondary btn-secondary--pill ${favorited ? 'artist-header-fav--active' : ''}`.trim()}
-              aria-label={favorited ? `Remove ${artist.name} from favorites` : `Add ${artist.name} to favorites`}
-              aria-pressed={favorited}
-            >
-              {favorited ? (
-                <IconStarFilled size={15} aria-hidden={true} />
-              ) : (
-                <IconStar size={15} aria-hidden={true} />
-              )}
-              <span>{favorited ? 'Favorited Creator' : 'Favorite Creator'}</span>
-            </button>
+            <div className="artist-profile__actions">
+              <button
+                type="button"
+                onClick={onToggleFavorite}
+                className={`btn-secondary btn-secondary--pill ${favorited ? 'artist-header-fav--active' : ''}`.trim()}
+                aria-label={favorited ? `Remove ${artist.name} from favorites` : `Add ${artist.name} to favorites`}
+                aria-pressed={favorited}
+              >
+                {favorited ? (
+                  <IconStarFilled size={16} aria-hidden={true} />
+                ) : (
+                  <IconStar size={16} aria-hidden={true} />
+                )}
+                <span>{favorited ? 'Favorited Creator' : 'Favorite Creator'}</span>
+              </button>
 
-            <Link
-              to={`/artist/${artist.slug}/edit`}
-              className="btn-secondary btn-secondary--pill"
-              title="Edit Artist Details & Profile Pictures"
-              aria-label={`Edit ${artist.name} details and profile pictures`}
-            >
-              <IconEdit size={14} aria-hidden={true} />
-              <span>Edit Artist</span>
-            </Link>
+              <Link
+                to={`/artist/${artist.slug}/edit`}
+                className="btn-secondary btn-secondary--pill"
+                title="Edit Artist Details & Profile Pictures"
+                aria-label={`Edit ${artist.name} details and profile pictures`}
+              >
+                <IconEdit size={16} aria-hidden={true} />
+                <span>Edit Artist</span>
+              </Link>
+            </div>
           </div>
 
           {artist.bio && <p className="artist-profile__bio">{artist.bio}</p>}

@@ -195,9 +195,11 @@ export default function CreateArtistPage() {
           {/* Artist Name */}
           <div className="form-group">
             <label htmlFor="create-artist-name" className="form-label">
-              <span>Artist Name</span>
-              <span className="create-artist__required-mark" aria-hidden="true">*</span>
-              <span className="sr-only">(Required)</span>
+              <span className="form-label__title">
+                <span>Artist Name</span>
+                <span className="create-artist__required-mark" aria-hidden="true">*</span>
+                <span className="sr-only">(Required)</span>
+              </span>
             </label>
             <input
               id="create-artist-name"
@@ -214,9 +216,11 @@ export default function CreateArtistPage() {
           {/* Artist URL ID / Slug */}
           <div className="form-group">
             <label htmlFor="create-artist-slug" className="form-label">
-              <span>Artist URL ID</span>
-              <span className="create-artist__required-mark" aria-hidden="true">*</span>
-              <span className="sr-only">(Required)</span>
+              <span className="form-label__title">
+                <span>Artist URL ID</span>
+                <span className="create-artist__required-mark" aria-hidden="true">*</span>
+                <span className="sr-only">(Required)</span>
+              </span>
               <span className="form-label__hint">Numeric or Creator ID (e.g., 37736420)</span>
             </label>
             <input
