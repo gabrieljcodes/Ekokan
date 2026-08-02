@@ -18,16 +18,34 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiError(body.error || res.statusText, res.status);
+
+  const method = (options?.method || 'GET').toString().toUpperCase();
+  const maxRetries = method === 'GET' ? 2 : 0;
+  
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new ApiError(body.error || res.statusText, res.status);
+      }
+      if (res.status === 204) return undefined as T;
+      return await res.json();
+    } catch (err: unknown) {
+      lastError = err;
+      // Do not retry HTTP server error statuses or deliberate request aborts
+      if (err instanceof ApiError || (err instanceof Error && err.name === 'AbortError') || attempt === maxRetries) {
+        throw err;
+      }
+      // Transient browser TCP connection drop (e.g., waking idle tab) — backoff and try again on clean socket
+      await new Promise(resolve => setTimeout(resolve, 350 * Math.pow(2, attempt)));
+    }
   }
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  throw lastError;
 }
 
 async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: Record<string, string>): Promise<T> {

@@ -54,7 +54,6 @@ export default function Dashboard() {
         if (!ignore) {
           console.error('Failed to load artist archive:', err);
           setError('Failed to contact the Ekokan archive service. Please check your network connection or self-hosted backend status.');
-          setResult(null);
         }
       })
       .finally(() => {
@@ -112,7 +111,7 @@ export default function Dashboard() {
               <span className="loading-spinner" aria-hidden="true" />
               <span>Loading creator archive...</span>
             </div>
-          ) : error ? (
+          ) : error && (!result || result.data.length === 0) ? (
             <div className="dashboard-error-card" role="alert">
               <IconWarning size={40} className="dashboard-error__icon" aria-hidden={true} />
               <h2 className="dashboard-error__title">Archive Catalog Offline</h2>
