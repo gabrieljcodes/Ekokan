@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"ekokan/internal/auth"
@@ -18,12 +19,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type tokenCacheEntry struct {
+	claims   *auth.Claims
+	cachedAt time.Time
+}
+
 type ApiTokenRepo struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	mu    sync.RWMutex
+	cache map[string]tokenCacheEntry
 }
 
 func NewApiTokenRepo(pool *pgxpool.Pool) *ApiTokenRepo {
-	return &ApiTokenRepo{pool: pool}
+	return &ApiTokenRepo{
+		pool:  pool,
+		cache: make(map[string]tokenCacheEntry),
+	}
 }
 
 func (r *ApiTokenRepo) Create(ctx context.Context, userID uuid.UUID, name string) (*models.ApiToken, error) {
@@ -95,6 +106,11 @@ func (r *ApiTokenRepo) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUI
 	if tag.RowsAffected() == 0 {
 		return errors.New("api token not found or unauthorized")
 	}
+
+	r.mu.Lock()
+	r.cache = make(map[string]tokenCacheEntry)
+	r.mu.Unlock()
+
 	return nil
 }
 
@@ -104,6 +120,14 @@ func (r *ApiTokenRepo) ValidateApiToken(ctx context.Context, token string) (*aut
 	}
 	hash := sha256.Sum256([]byte(token))
 	hashStr := hex.EncodeToString(hash[:])
+
+	r.mu.RLock()
+	if entry, ok := r.cache[hashStr]; ok && time.Since(entry.cachedAt) < 5*time.Minute {
+		r.mu.RUnlock()
+		cached := *entry.claims
+		return &cached, nil
+	}
+	r.mu.RUnlock()
 
 	var claims auth.Claims
 	var tokenID uuid.UUID
@@ -131,5 +155,13 @@ func (r *ApiTokenRepo) ValidateApiToken(ctx context.Context, token string) (*aut
 	}()
 
 	claims.ExpiresAt = time.Now().Add(365 * 24 * time.Hour).Unix()
+
+	r.mu.Lock()
+	r.cache[hashStr] = tokenCacheEntry{
+		claims:   &claims,
+		cachedAt: time.Now(),
+	}
+	r.mu.Unlock()
+
 	return &claims, nil
 }
