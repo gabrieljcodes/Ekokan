@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -77,6 +79,7 @@ func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 		}
 	}
 
+	slog.Info("storage: hardware-adaptive FFI concurrency active", "system_cpus", runtime.GOMAXPROCS(0), "max_concurrent_ffi_threads", cap(ffiSem))
 	return &OpenDALStore{
 		op:      op,
 		backend: cfg.StorageBackend,
@@ -84,9 +87,21 @@ func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 	}, nil
 }
 
-// ffiSem limits concurrent OpenDAL FFI executions across all workers to prevent thread starvation
-// and Go runtime CPU blocking during high-concurrency bulk imports.
-var ffiSem = make(chan struct{}, 3)
+// ffiSem dynamically limits concurrent OpenDAL FFI executions based on hardware logical CPUs
+// to prevent thread starvation on smaller VPS instances while scaling throughput on multi-core servers.
+var ffiSem = initFFISemaphore()
+
+func initFFISemaphore() chan struct{} {
+	cpus := runtime.GOMAXPROCS(0)
+	// Reserve at least 2 cores unblocked exclusively for HTTP server traffic and Postgres networking.
+	limit := cpus - 2
+	if limit < 1 {
+		limit = 1 // Ensure low-core (1-2 CPU) machines remain stable and unblocked
+	} else if limit > 16 {
+		limit = 16 // Prevent file descriptor and socket saturation on high-end enterprise servers
+	}
+	return make(chan struct{}, limit)
+}
 
 func (s *OpenDALStore) Put(ctx context.Context, key string, data []byte) error {
 	select {

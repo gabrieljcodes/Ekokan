@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,8 +42,13 @@ func StartThumbnailWorker(pool *pgxpool.Pool, store *storage.OpenDALStore) {
 	rows.Close()
 
 	totalFiles := len(items)
-	const numWorkers = 4 // Concurrency bounded by ffiSem in storage.go; workers can safely be higher
-	slog.Info("thumbnail worker: starting concurrent scan in storage", "total_files", totalFiles, "concurrency_workers", numWorkers)
+	numWorkers := runtime.GOMAXPROCS(0)
+	if numWorkers < 2 {
+		numWorkers = 1
+	} else if numWorkers > 16 {
+		numWorkers = 16 // Prevent resource overhead on large multi-core servers
+	}
+	slog.Info("thumbnail worker: starting hardware-adaptive scan in storage", "total_files", totalFiles, "concurrency_workers", numWorkers)
 
 	itemChan := make(chan fileItem, numWorkers*4)
 	var generatedCount int32
