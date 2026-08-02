@@ -9,6 +9,7 @@ import (
 
 	"ekokan/internal/auth"
 	"ekokan/internal/docs"
+	"ekokan/internal/opengraph"
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
 
@@ -202,15 +203,27 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 		deps.Store.ServeFile(w, r, key)
 	})
 
-	// Serve static SPA frontend
+	// Serve static SPA frontend with Native OpenGraph metadata injection
 	if deps.StaticDir != "" {
 		if info, err := os.Stat(deps.StaticDir); err == nil && info.IsDir() {
 			staticFs := http.FileServer(http.Dir(deps.StaticDir))
+			ogService := opengraph.NewService(deps.Artists, deps.Posts, deps.Store)
+
 			r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-				path := filepath.Join(deps.StaticDir, filepath.FromSlash(r.URL.Path))
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					// Fallback to index.html for SPA client routing
-					http.ServeFile(w, r, filepath.Join(deps.StaticDir, "index.html"))
+				cleanPath := strings.TrimSpace(r.URL.Path)
+				indexPath := filepath.Join(deps.StaticDir, "index.html")
+
+				// Direct hit on root home page or fallback HTML route
+				if cleanPath == "/" || cleanPath == "" || strings.EqualFold(cleanPath, "/index.html") {
+					ogService.ServeHTML(w, r, indexPath)
+					return
+				}
+
+				path := filepath.Join(deps.StaticDir, filepath.FromSlash(cleanPath))
+				info, err := os.Stat(path)
+				if os.IsNotExist(err) || (err == nil && info.IsDir()) {
+					// Fallback to OpenGraph-enhanced index.html for SPA client routing (artist, post profiles)
+					ogService.ServeHTML(w, r, indexPath)
 					return
 				}
 				staticFs.ServeHTTP(w, r)
