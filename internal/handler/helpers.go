@@ -15,9 +15,18 @@ import (
 // JSON response helpers
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("failed to marshal JSON response", "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"internal json encoding error"}`))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	w.Write(b)
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

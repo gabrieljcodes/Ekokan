@@ -30,11 +30,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         headers,
       });
       if (!res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          throw new ApiError('Server returned an HTML response instead of JSON. Please ensure your Ekokan server binary is recompiled and restarted.', res.status);
+        }
         const body = await res.json().catch(() => ({ error: res.statusText }));
         throw new ApiError(body.error || res.statusText, res.status);
       }
       if (res.status === 204) return undefined as T;
-      return await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new ApiError('API endpoint returned HTML instead of JSON. Your Ekokan backend server binary needs to be recompiled and restarted with the latest route changes.', 500);
+      }
+      try {
+        return await res.json();
+      } catch (e) {
+        throw new ApiError('Failed to parse server response as valid JSON. Please verify your Ekokan server binary is updated.', 500);
+      }
     } catch (err: unknown) {
       lastError = err;
       // Do not retry HTTP server error statuses or deliberate request aborts
@@ -67,10 +79,22 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
     body: form,
   });
   if (!res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      throw new ApiError('Server returned an HTML error page instead of JSON. Please ensure your Ekokan server binary is recompiled and restarted.', res.status);
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(body.error || res.statusText, res.status);
   }
-  return res.json();
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    throw new ApiError('API endpoint returned HTML instead of JSON. Your Ekokan backend server binary needs to be recompiled and restarted with the latest route changes.', 500);
+  }
+  try {
+    return await res.json();
+  } catch (e) {
+    throw new ApiError('Failed to parse server upload response as valid JSON.', 500);
+  }
 }
 
 import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings, ApiToken, UserProfileData } from '../types/models';

@@ -216,6 +216,11 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 
 			r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 				cleanPath := strings.TrimSpace(r.URL.Path)
+				if strings.HasPrefix(cleanPath, "/api/") || cleanPath == "/api" {
+					writeError(w, http.StatusNotFound, "api endpoint not found")
+					return
+				}
+
 				indexPath := filepath.Join(deps.StaticDir, "index.html")
 
 				// Direct hit on root home page or fallback HTML route
@@ -235,6 +240,14 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			})
 		}
 	}
+
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
+			writeError(w, http.StatusNotFound, "api endpoint not found")
+			return
+		}
+		http.NotFound(w, r)
+	})
 
 	return r
 }
