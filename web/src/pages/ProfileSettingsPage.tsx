@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import type { ApiToken, Tag } from '../types/models';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { IconUser, IconWarning, IconCheck, IconPlus, IconTrash, IconBan, IconCopy, IconRefresh, IconKey } from '../components/Icons';
+import { IconUser, IconWarning, IconCheck, IconPlus, IconTrash, IconBan, IconCopy, IconRefresh, IconKey, IconImage, IconUpload } from '../components/Icons';
 
 interface TokenItemProps {
   token: ApiToken;
@@ -64,7 +64,7 @@ const TokenListItem = React.memo(function TokenListItem({ token, onRevoke }: Tok
 });
 
 export default function ProfileSettingsPage() {
-  const { user, excludedTagIds, saveExcludedTags, updateUserAvatar } = useAuth();
+  const { user, excludedTagIds, saveExcludedTags, updateUserAvatar, updateUserBanner } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'profile';
 
@@ -72,6 +72,11 @@ export default function ProfileSettingsPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [avatarSuccess, setAvatarSuccess] = useState('');
+
+  // Banner upload state
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [bannerError, setBannerError] = useState('');
+  const [bannerSuccess, setBannerSuccess] = useState('');
 
   // Excluded tags state
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -173,6 +178,28 @@ export default function ProfileSettingsPage() {
       if (isMountedRef.current) setUploadingAvatar(false);
     }
   }, [updateUserAvatar]);
+
+  const handleBannerChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBanner(true);
+    setBannerError('');
+    setBannerSuccess('');
+    try {
+      const updatedUser = await api.uploadUserBanner(file);
+      if (isMountedRef.current) {
+        updateUserBanner(updatedUser);
+        setBannerSuccess('Profile banner image updated successfully!');
+      }
+    } catch (err: unknown) {
+      if (isMountedRef.current) {
+        if (err instanceof Error) setBannerError(err.message || 'Failed to upload banner');
+        else setBannerError('Failed to upload profile banner');
+      }
+    } finally {
+      if (isMountedRef.current) setUploadingBanner(false);
+    }
+  }, [updateUserBanner]);
 
   const handleSaveTags = useCallback(async () => {
     setSavingTags(true);
@@ -399,6 +426,68 @@ export default function ProfileSettingsPage() {
                 aria-label="Upload new profile avatar illustration image (PNG, JPG, WebP, or animated GIF)"
               />
             </div>
+          </div>
+
+          <div className="profile-settings__banner-section">
+            <div className="profile-settings__banner-title">Profile Banner Header</div>
+            <div className="profile-settings__banner-desc">
+              Personalize your public profile with a custom header background image (recommended width: 1200px or higher).
+            </div>
+
+            {bannerError && (
+              <div className="form-error" role="alert" aria-live="assertive">
+                <IconWarning size={18} aria-hidden={true} />
+                <span>{bannerError}</span>
+              </div>
+            )}
+            {bannerSuccess && (
+              <div className="form-success" role="status" aria-live="polite">
+                <IconCheck size={18} aria-hidden={true} />
+                <span>{bannerSuccess}</span>
+              </div>
+            )}
+
+            <div className="profile-settings__banner-preview">
+              {user.banner_url ? (
+                <img
+                  src={user.banner_url}
+                  alt={`Profile banner illustration of ${user.username}`}
+                  className="profile-settings__banner-img"
+                  decoding="async"
+                />
+              ) : (
+                <div className="profile-settings__banner-fallback" role="img" aria-label="Default gradient profile banner">
+                  <IconImage size={28} aria-hidden={true} />
+                  <span>Default Gradient Banner</span>
+                </div>
+              )}
+            </div>
+
+            <label
+              htmlFor="banner-upload-input"
+              className={`btn-primary profile-settings__avatar-btn profile-settings__banner-btn ${uploadingBanner ? 'profile-settings__avatar-btn--waiting' : ''}`}
+            >
+              {uploadingBanner ? (
+                <>
+                  <IconRefresh size={14} aria-hidden={true} />
+                  <span>Uploading Banner...</span>
+                </>
+              ) : (
+                <>
+                  <IconUpload size={14} aria-hidden={true} />
+                  <span>Change Profile Banner</span>
+                </>
+              )}
+            </label>
+            <input
+              id="banner-upload-input"
+              type="file"
+              accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+              onChange={handleBannerChange}
+              disabled={uploadingBanner}
+              className="sr-only"
+              aria-label="Upload new profile banner header image (PNG, JPG, WebP, or animated GIF)"
+            />
           </div>
         </section>
       )}

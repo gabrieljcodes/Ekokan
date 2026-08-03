@@ -38,9 +38,9 @@ func (r *UserRepo) Create(ctx context.Context, input CreateUserInput) (*models.U
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO users (username, email, password_hash, display_name, role)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, username, email, password_hash, display_name, avatar_file_id, role, is_active, created_at, updated_at
+		RETURNING id, username, email, password_hash, display_name, avatar_file_id, banner_file_id, role, is_active, created_at, updated_at
 	`, input.Username, input.Email, input.PasswordHash, input.DisplayName, input.Role).Scan(
-		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.BannerFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating user: %w", err)
@@ -50,16 +50,17 @@ func (r *UserRepo) Create(ctx context.Context, input CreateUserInput) (*models.U
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	var u models.User
-	var avatarPath *string
+	var avatarPath, bannerPath *string
 	err := r.pool.QueryRow(ctx, `
-		SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_file_id, u.role, u.is_active, u.created_at, u.updated_at,
-		       af.file_path
+		SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_file_id, u.banner_file_id, u.role, u.is_active, u.created_at, u.updated_at,
+		       af.file_path, bf.file_path
 		FROM users u
 		LEFT JOIN files af ON u.avatar_file_id = af.id
+		LEFT JOIN files bf ON u.banner_file_id = bf.id
 		WHERE u.username = $1
 	`, username).Scan(
-		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
-		&avatarPath,
+		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.BannerFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&avatarPath, &bannerPath,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -70,21 +71,25 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*models.
 	if avatarPath != nil && r.store != nil {
 		u.AvatarURL = r.store.PublicURL(*avatarPath)
 	}
+	if bannerPath != nil && r.store != nil {
+		u.BannerURL = r.store.PublicURL(*bannerPath)
+	}
 	return &u, nil
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var u models.User
-	var avatarPath *string
+	var avatarPath, bannerPath *string
 	err := r.pool.QueryRow(ctx, `
-		SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_file_id, u.role, u.is_active, u.created_at, u.updated_at,
-		       af.file_path
+		SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_file_id, u.banner_file_id, u.role, u.is_active, u.created_at, u.updated_at,
+		       af.file_path, bf.file_path
 		FROM users u
 		LEFT JOIN files af ON u.avatar_file_id = af.id
+		LEFT JOIN files bf ON u.banner_file_id = bf.id
 		WHERE u.id = $1
 	`, id).Scan(
-		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
-		&avatarPath,
+		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName, &u.AvatarFileID, &u.BannerFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&avatarPath, &bannerPath,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -95,11 +100,19 @@ func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.User, err
 	if avatarPath != nil && r.store != nil {
 		u.AvatarURL = r.store.PublicURL(*avatarPath)
 	}
+	if bannerPath != nil && r.store != nil {
+		u.BannerURL = r.store.PublicURL(*bannerPath)
+	}
 	return &u, nil
 }
 
 func (r *UserRepo) UpdateAvatar(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, `UPDATE users SET avatar_file_id = $2, updated_at = NOW() WHERE id = $1`, userID, fileID)
+	return err
+}
+
+func (r *UserRepo) UpdateBanner(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET banner_file_id = $2, updated_at = NOW() WHERE id = $1`, userID, fileID)
 	return err
 }
 
@@ -116,10 +129,11 @@ func (r *UserRepo) SetRole(ctx context.Context, username string, role string) er
 
 func (r *UserRepo) ListUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT u.id, u.username, u.email, u.display_name, u.avatar_file_id, u.role, u.is_active, u.created_at, u.updated_at,
-		       af.file_path
+		SELECT u.id, u.username, u.email, u.display_name, u.avatar_file_id, u.banner_file_id, u.role, u.is_active, u.created_at, u.updated_at,
+		       af.file_path, bf.file_path
 		FROM users u
 		LEFT JOIN files af ON u.avatar_file_id = af.id
+		LEFT JOIN files bf ON u.banner_file_id = bf.id
 		ORDER BY u.created_at DESC
 		LIMIT 500
 	`)
@@ -131,12 +145,15 @@ func (r *UserRepo) ListUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		var avatarPath *string
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.DisplayName, &u.AvatarFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &avatarPath); err != nil {
+		var avatarPath, bannerPath *string
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.DisplayName, &u.AvatarFileID, &u.BannerFileID, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &avatarPath, &bannerPath); err != nil {
 			return nil, fmt.Errorf("scanning user: %w", err)
 		}
 		if avatarPath != nil && r.store != nil {
 			u.AvatarURL = r.store.PublicURL(*avatarPath)
+		}
+		if bannerPath != nil && r.store != nil {
+			u.BannerURL = r.store.PublicURL(*bannerPath)
 		}
 		users = append(users, u)
 	}

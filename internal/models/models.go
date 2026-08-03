@@ -32,6 +32,8 @@ type User struct {
 	DisplayName  *string    `json:"display_name,omitempty"`
 	AvatarFileID *uuid.UUID `json:"avatar_file_id,omitempty"`
 	AvatarURL    string     `json:"avatar_url,omitempty"`
+	BannerFileID *uuid.UUID `json:"banner_file_id,omitempty"`
+	BannerURL    string     `json:"banner_url,omitempty"`
 	Role         string     `json:"role"`
 	IsActive     bool       `json:"is_active"`
 	CreatedAt    time.Time  `json:"created_at"`

@@ -23,6 +23,7 @@ interface AuthContextType {
   isLikedPost: (postId: string) => boolean;
   saveExcludedTags: (tagIds: string[]) => Promise<void>;
   updateUserAvatar: (updatedUser: User) => void;
+  updateUserBanner: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -166,6 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(updatedUser);
   }, []);
 
+  const updateUserBanner = useCallback((updatedUser: User) => {
+    setUser(updatedUser);
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -188,6 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLikedPost,
       saveExcludedTags,
       updateUserAvatar,
+      updateUserBanner,
     }),
     [
       user,
@@ -210,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLikedPost,
       saveExcludedTags,
       updateUserAvatar,
+      updateUserBanner,
     ]
   );
 

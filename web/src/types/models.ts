@@ -41,6 +41,8 @@ export interface User {
   display_name?: string;
   avatar_file_id?: string;
   avatar_url?: string;
+  banner_file_id?: string;
+  banner_url?: string;
   role: string;
   is_active: boolean;
   created_at: string;

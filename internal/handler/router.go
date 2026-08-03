@@ -108,6 +108,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 				r.Post("/me/api-tokens", tokenH.CreateToken)
 				r.Delete("/me/api-tokens/{id}", tokenH.DeleteToken)
 				r.Post("/me/avatar", authH.UploadAvatar)
+				r.Post("/me/banner", authH.UploadBanner)
 				r.Post("/me/excluded-tags", authH.SetExcludedTags)
 			})
 		})

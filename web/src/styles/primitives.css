@@ -582,8 +582,8 @@
   height: 24px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid var(--border);
-  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-elevated);
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
 }
 .comment__avatar--sm {
@@ -597,9 +597,9 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background-color: var(--surface-tertiary, #2c3038);
+  background-color: var(--bg-elevated);
   color: var(--text-muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
 }
 .comment__avatar-fallback--sm {
   width: 20px;

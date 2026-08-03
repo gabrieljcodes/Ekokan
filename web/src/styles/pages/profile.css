@@ -11,8 +11,8 @@
 
 .profile-banner-card {
   position: relative;
-  background-color: var(--surface-secondary);
-  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
@@ -20,10 +20,18 @@
 }
 
 .profile-banner-card__header-gradient {
-  height: 140px;
-  background: linear-gradient(135deg, #231942 0%, #153860 50%, #116075 100%);
+  height: 160px;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-elevated) 50%, var(--accent-muted) 100%);
   position: relative;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.profile-banner-card__header-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .profile-banner-card__content {
@@ -48,8 +56,8 @@
   height: 108px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid var(--surface-secondary);
-  background-color: var(--surface-tertiary, #2c3038);
+  border: 4px solid var(--bg-card);
+  background-color: var(--bg-elevated);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   transition: transform 0.3s ease;
 }
@@ -65,8 +73,8 @@
   width: 108px;
   height: 108px;
   border-radius: 50%;
-  border: 4px solid var(--surface-secondary);
-  background-color: var(--surface-tertiary, #2c3038);
+  border: 4px solid var(--bg-card);
+  background-color: var(--bg-elevated);
   color: var(--text-muted);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
@@ -76,15 +84,15 @@
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  background: linear-gradient(135deg, #ff6b6b, #dc2626);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--danger), var(--brand-favorite));
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 700;
   border-radius: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 8px;
-  box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+  box-shadow: 0 0 10px rgba(224, 106, 106, 0.35);
 }
 
 .profile-banner-card__info {
@@ -96,7 +104,7 @@
 .profile-banner-card__display-name {
   font-size: 2rem;
   font-weight: 800;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   line-height: 1.2;
   margin: 0;
   letter-spacing: -0.02em;
@@ -122,7 +130,7 @@
   gap: var(--space-xl);
   padding: var(--space-sm) var(--space-lg);
   background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
 }
 
@@ -135,7 +143,7 @@
 .profile-stat-item__value {
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--accent, #6aafe6);
+  color: var(--accent);
   line-height: 1.2;
 }
 
@@ -151,7 +159,7 @@
   margin-bottom: var(--space-lg);
   display: flex;
   gap: var(--space-sm);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: var(--space-sm);
   flex-wrap: wrap;
 }
@@ -168,8 +176,8 @@
 
 .profile-comment-card {
   padding: var(--space-md);
-  background-color: var(--surface-secondary);
-  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -177,14 +185,14 @@
 .profile-comment-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  border-color: rgba(106, 175, 230, 0.35);
+  border-color: var(--accent);
 }
 
 .profile-comment-card__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: var(--fs-xs, 0.8rem);
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-bottom: var(--space-sm);
   gap: var(--space-md);
@@ -197,8 +205,10 @@
 }
 
 .profile-comment-card__post-link {
+  display: inline-block;
+  padding: 4px 0;
   text-decoration: none;
-  color: var(--accent, #6aafe6);
+  color: var(--accent);
   font-weight: 600;
   transition: opacity 0.2s ease;
 }
@@ -209,8 +219,8 @@
 }
 
 .profile-comment-card__body {
-  font-size: var(--fs-base, 1rem);
-  color: var(--text-primary, #ffffff);
+  font-size: var(--fs-base);
+  color: var(--text-primary);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;

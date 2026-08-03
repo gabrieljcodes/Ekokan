@@ -181,6 +181,9 @@ export const api = {
   uploadUserAvatar: (file: globalThis.File) =>
     uploadFile<User>('/api/users/me/avatar', file),
 
+  uploadUserBanner: (file: globalThis.File) =>
+    uploadFile<User>('/api/users/me/banner', file),
+
   setExcludedTags: (tagIds: string[]) =>
     request<{ success: boolean; excluded_tag_ids: string[] }>('/api/users/me/excluded-tags', { method: 'POST', body: JSON.stringify({ tag_ids: tagIds }) }),
 

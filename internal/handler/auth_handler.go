@@ -238,6 +238,58 @@ func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, user)
 }
 
+func (h *AuthHandler) UploadBanner(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20) // 20MB limit for banner
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close()
+
+	result, err := storage.ProcessUpload(r.Context(), h.store, header.Filename, file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	fileModel := &models.File{
+		SHA256:         result.SHA256,
+		FilePath:       result.FilePath,
+		OriginalName:   result.OriginalName,
+		MimeType:       result.MimeType,
+		FileSize:       result.FileSize,
+		StorageBackend: "fs",
+	}
+
+	_, err = h.files.FindOrCreate(r.Context(), fileModel)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	err = h.users.UpdateBanner(r.Context(), userID, fileModel.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update user banner")
+		return
+	}
+
+	user, err := h.users.GetByID(r.Context(), userID)
+	if err != nil || user == nil {
+		writeError(w, http.StatusInternalServerError, "failed to load updated user")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
 type excludedTagsRequest struct {
 	TagIDs []string `json:"tag_ids"`
 }

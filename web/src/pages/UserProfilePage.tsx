@@ -118,13 +118,30 @@ export default function UserProfilePage() {
       <main className="profile-main" role="main">
         {/* Impeccable Profile Banner Card */}
         <section className="profile-banner-card" aria-label={`Profile banner for ${user.display_name || user.username}`}>
-          <div className="profile-banner-card__header-gradient" />
+          <div className="profile-banner-card__header-gradient">
+            {user.banner_url && (
+              <img
+                src={user.banner_url}
+                alt={`${user.username}'s customized header banner`}
+                className="profile-banner-card__header-img"
+                fetchPriority="high"
+                decoding="async"
+              />
+            )}
+          </div>
           <div className="profile-banner-card__content">
             <div className="profile-banner-card__avatar-wrapper">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={`${user.username}'s avatar`} className="profile-banner-card__avatar" />
+                <img
+                  src={user.avatar_url}
+                  alt={`${user.username}'s avatar`}
+                  className="profile-banner-card__avatar"
+                  width={108}
+                  height={108}
+                  fetchPriority="high"
+                />
               ) : (
-                <div className="profile-banner-card__avatar-fallback">
+                <div className="profile-banner-card__avatar-fallback" role="img" aria-label="Default profile icon">
                   <IconUser size={56} aria-hidden={true} />
                 </div>
               )}
