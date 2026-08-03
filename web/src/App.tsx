@@ -14,6 +14,7 @@ import FavoritesPage from './pages/FavoritesPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import ApiTokensPage from './pages/ApiTokensPage';
 import ProfileSettingsPage from './pages/ProfileSettingsPage';
+import UserProfilePage from './pages/UserProfilePage';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/user/:username" element={<UserProfilePage />} />
             <Route path="/profile" element={<ProfileSettingsPage />} />
             <Route path="/tokens" element={<ApiTokensPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />

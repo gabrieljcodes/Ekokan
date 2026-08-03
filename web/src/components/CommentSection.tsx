@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import type { Comment } from '../types/models';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -28,13 +29,32 @@ function formatDate(dateStr: string): string {
 const CommentItem = React.memo(function CommentItem({ comment }: { comment: Comment }) {
   const isMember = comment.is_member || !!comment.user_id;
   const isAdmin = comment.author_role === 'admin';
+  const profileUrl = comment.author_username ? `/user/${encodeURIComponent(comment.author_username)}` : null;
 
   return (
     <div className={`comment ${isMember ? 'comment-item--member' : ''}`} role="article" aria-label={`Comment by ${comment.author_name || 'Anonymous'}`}>
       <div className="comment__header comment__header-row">
-        <span className={`comment__author ${isMember ? 'comment__author--member' : ''}`}>
-          {comment.author_name}
-        </span>
+        <div className="comment__author-wrapper">
+          {profileUrl ? (
+            <Link to={profileUrl} className="comment__author-link">
+              {comment.author_avatar_url ? (
+                <img src={comment.author_avatar_url} alt="" className="comment__avatar" />
+              ) : (
+                <span className="comment__avatar-fallback"><IconUser size={14} aria-hidden={true} /></span>
+              )}
+              <span className={`comment__author ${isMember ? 'comment__author--member' : ''}`}>
+                {comment.author_name}
+              </span>
+            </Link>
+          ) : (
+            <div className="comment__author-guest">
+              <span className="comment__avatar-fallback"><IconUser size={14} aria-hidden={true} /></span>
+              <span className="comment__author">
+                {comment.author_name}
+              </span>
+            </div>
+          )}
+        </div>
         {isAdmin ? (
           <span className="member-badge member-badge--admin">Admin</span>
         ) : isMember ? (
@@ -115,9 +135,13 @@ export default function CommentSection({ postId, comments, onCommentAdded }: Pro
       <form className="comment-form" onSubmit={handleSubmit} aria-busy={submitting}>
         {user ? (
           <div className="comment-form__user-status">
-            <span className="comment-form__user-status-icon">
-              <IconUser size={16} aria-hidden={true} />
-              <span>Commenting as authenticated Member: <strong>{user.display_name || user.username}</strong></span>
+            <span className="comment-form__user-status-profile">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="comment__avatar comment__avatar--sm" />
+              ) : (
+                <span className="comment__avatar-fallback comment__avatar-fallback--sm"><IconUser size={14} aria-hidden={true} /></span>
+              )}
+              <strong className="comment-form__author-name">{user.display_name || user.username}</strong>
             </span>
             <span className="member-badge">Member</span>
           </div>

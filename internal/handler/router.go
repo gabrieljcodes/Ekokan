@@ -66,7 +66,7 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 	postH := NewPostHandler(deps.Posts, deps.Files, deps.Artists, deps.Settings, deps.Store)
 	tagH := NewTagHandler(deps.Tags, deps.Posts)
 	commentH := NewCommentHandler(deps.Comments, deps.Posts, deps.Users)
-	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.Files, deps.Store, deps.JWTSecret, deps.AllowPublicReg)
+	authH := NewAuthHandler(deps.Users, deps.Favorites, deps.Files, deps.Comments, deps.Store, deps.JWTSecret, deps.AllowPublicReg)
 	favH := NewFavoriteHandler(deps.Favorites)
 	settingsH := NewSettingsHandler(deps.Settings, deps.Users)
 	tokenH := NewApiTokenHandler(deps)
@@ -95,8 +95,12 @@ func NewRouter(deps Deps, corsOrigins string) *chi.Mux {
 			})
 		})
 
-		// User personal endpoints
+		// User personal and profile endpoints
 		r.Route("/users", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(auth.OptionalAuth(deps.JWTSecret, deps.ApiTokens))
+				r.Get("/{username}/profile", authH.GetUserProfile)
+			})
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireAuth(deps.JWTSecret, deps.ApiTokens))
 				r.Get("/me/favorites", favH.ListMyFavorites)

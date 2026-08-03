@@ -11,6 +11,7 @@ import (
 	"ekokan/internal/repository"
 	"ekokan/internal/storage"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,16 +20,18 @@ type AuthHandler struct {
 	users          *repository.UserRepo
 	favs           *repository.FavoriteRepo
 	files          *repository.FileRepo
+	comments       *repository.CommentRepo
 	store          *storage.OpenDALStore
 	jwtSecret      string
 	allowPublicReg bool
 }
 
-func NewAuthHandler(users *repository.UserRepo, favs *repository.FavoriteRepo, files *repository.FileRepo, store *storage.OpenDALStore, jwtSecret string, allowPublicReg bool) *AuthHandler {
+func NewAuthHandler(users *repository.UserRepo, favs *repository.FavoriteRepo, files *repository.FileRepo, comments *repository.CommentRepo, store *storage.OpenDALStore, jwtSecret string, allowPublicReg bool) *AuthHandler {
 	return &AuthHandler{
 		users:          users,
 		favs:           favs,
 		files:          files,
+		comments:       comments,
 		store:          store,
 		jwtSecret:      jwtSecret,
 		allowPublicReg: allowPublicReg,
@@ -267,5 +270,54 @@ func (h *AuthHandler) SetExcludedTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":          true,
 		"excluded_tag_ids": req.TagIDs,
+	})
+}
+
+func (h *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+	if strings.TrimSpace(username) == "" {
+		writeError(w, http.StatusBadRequest, "username required")
+		return
+	}
+
+	user, err := h.users.GetByUsername(r.Context(), username)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to query user profile: "+err.Error())
+		return
+	}
+	if user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	// Sanitize sensitive fields for public profile display
+	user.Email = nil
+	user.PasswordHash = nil
+
+	var comments []models.Comment
+	if h.comments != nil {
+		comments, err = h.comments.ListByUser(r.Context(), user.ID, 50)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list user comments: "+err.Error())
+			return
+		}
+	}
+
+	artists, err := h.favs.ListUserFavArtists(r.Context(), user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list favorite artists: "+err.Error())
+		return
+	}
+	posts, err := h.favs.ListUserFavPosts(r.Context(), user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list favorite posts: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"user":             user,
+		"comments":         comments,
+		"favorite_artists": artists,
+		"favorite_posts":   posts,
 	})
 }

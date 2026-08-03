@@ -94,6 +94,15 @@ export default function Layout() {
                 {dropdownOpen && (
                   <div className="user-dropdown__menu" role="menu">
                     <Link
+                      to={`/user/${encodeURIComponent(user.username)}`}
+                      className="user-dropdown__item user-dropdown__item--profile"
+                      role="menuitem"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      My Public Profile
+                    </Link>
+                    <div className="user-dropdown__divider" role="separator" />
+                    <Link
                       to="/profile?tab=profile"
                       className="user-dropdown__item"
                       role="menuitem"

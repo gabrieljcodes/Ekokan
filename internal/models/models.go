@@ -129,9 +129,15 @@ type Comment struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 
 	// Nested & enriched fields
-	AuthorRole *string   `json:"author_role,omitempty"`
-	IsMember   bool      `json:"is_member,omitempty"`
-	Replies    []Comment `json:"replies,omitempty"`
+	AuthorRole      *string   `json:"author_role,omitempty"`
+	IsMember        bool      `json:"is_member,omitempty"`
+	Replies         []Comment `json:"replies,omitempty"`
+	AuthorUsername  *string   `json:"author_username,omitempty"`
+	AuthorAvatarURL *string   `json:"author_avatar_url,omitempty"`
+	PostTitle       *string   `json:"post_title,omitempty"`
+	PostSlug        *string   `json:"post_slug,omitempty"`
+	ArtistName      *string   `json:"artist_name,omitempty"`
+	ArtistSlug      *string   `json:"artist_slug,omitempty"`
 }
 
 type Favorite struct {

@@ -73,7 +73,7 @@ async function uploadFile<T>(path: string, file: globalThis.File, extraFields?: 
   return res.json();
 }
 
-import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings, ApiToken } from '../types/models';
+import type { Artist, Post, Tag, Comment, PaginatedResult, AdjacentPosts, PostMedia, PostAttachment, User, AppSettings, ApiToken, UserProfileData } from '../types/models';
 
 export const api = {
   // Artists
@@ -196,6 +196,9 @@ export const api = {
 
   listMyFavorites: () =>
     request<{ artists: Artist[]; posts: Post[] }>('/api/users/me/favorites'),
+
+  getUserProfile: (username: string) =>
+    request<UserProfileData>(`/api/users/${encodeURIComponent(username)}/profile`),
 
   // Admin Settings & User Management
   getSettings: () =>

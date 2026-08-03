@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"ekokan/internal/models"
+	"ekokan/internal/storage"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,11 +13,12 @@ import (
 )
 
 type CommentRepo struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	store *storage.OpenDALStore
 }
 
-func NewCommentRepo(pool *pgxpool.Pool) *CommentRepo {
-	return &CommentRepo{pool: pool}
+func NewCommentRepo(pool *pgxpool.Pool, store *storage.OpenDALStore) *CommentRepo {
+	return &CommentRepo{pool: pool, store: store}
 }
 
 func (r *CommentRepo) ListByPost(ctx context.Context, postID uuid.UUID) ([]models.Comment, error) {
@@ -24,9 +26,10 @@ func (r *CommentRepo) ListByPost(ctx context.Context, postID uuid.UUID) ([]model
 		SELECT c.id, c.post_id, c.user_id, c.parent_id, 
 		       COALESCE(u.display_name, u.username, c.author_name), 
 		       c.content, c.is_edited, c.created_at, c.updated_at,
-		       u.role
+		       u.role, u.username, af.file_path
 		FROM comments c
 		LEFT JOIN users u ON c.user_id = u.id
+		LEFT JOIN files af ON u.avatar_file_id = af.id
 		WHERE c.post_id = $1
 		ORDER BY c.created_at ASC
 	`, postID)
@@ -38,15 +41,20 @@ func (r *CommentRepo) ListByPost(ctx context.Context, postID uuid.UUID) ([]model
 	var all []models.Comment
 	for rows.Next() {
 		var c models.Comment
+		var avatarPath *string
 		if err := rows.Scan(
 			&c.ID, &c.PostID, &c.UserID, &c.ParentID, &c.AuthorName,
 			&c.Content, &c.IsEdited, &c.CreatedAt, &c.UpdatedAt,
-			&c.AuthorRole,
+			&c.AuthorRole, &c.AuthorUsername, &avatarPath,
 		); err != nil {
 			return nil, err
 		}
 		if c.UserID != nil {
 			c.IsMember = true
+		}
+		if avatarPath != nil && r.store != nil {
+			url := r.store.PublicURL(*avatarPath)
+			c.AuthorAvatarURL = &url
 		}
 		all = append(all, c)
 	}
@@ -138,4 +146,55 @@ func (r *CommentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Commen
 		return nil, err
 	}
 	return &c, nil
+}
+
+func (r *CommentRepo) ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]models.Comment, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT c.id, c.post_id, c.user_id, c.parent_id, 
+		       COALESCE(u.display_name, u.username, c.author_name), 
+		       c.content, c.is_edited, c.created_at, c.updated_at,
+		       u.role, u.username, af.file_path,
+		       p.title, p.slug, a.name, a.slug
+		FROM comments c
+		LEFT JOIN users u ON c.user_id = u.id
+		LEFT JOIN files af ON u.avatar_file_id = af.id
+		LEFT JOIN posts p ON c.post_id = p.id
+		LEFT JOIN artists a ON p.artist_id = a.id
+		WHERE c.user_id = $1
+		ORDER BY c.created_at DESC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listing user comments: %w", err)
+	}
+	defer rows.Close()
+
+	var all []models.Comment
+	for rows.Next() {
+		var c models.Comment
+		var avatarPath *string
+		if err := rows.Scan(
+			&c.ID, &c.PostID, &c.UserID, &c.ParentID, &c.AuthorName,
+			&c.Content, &c.IsEdited, &c.CreatedAt, &c.UpdatedAt,
+			&c.AuthorRole, &c.AuthorUsername, &avatarPath,
+			&c.PostTitle, &c.PostSlug, &c.ArtistName, &c.ArtistSlug,
+		); err != nil {
+			return nil, err
+		}
+		if c.UserID != nil {
+			c.IsMember = true
+		}
+		if avatarPath != nil && r.store != nil {
+			url := r.store.PublicURL(*avatarPath)
+			c.AuthorAvatarURL = &url
+		}
+		all = append(all, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if all == nil {
+		all = []models.Comment{}
+	}
+	return all, nil
 }

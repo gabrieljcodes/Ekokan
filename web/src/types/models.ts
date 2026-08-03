@@ -112,6 +112,12 @@ export interface Comment {
   author_role?: string;
   is_member?: boolean;
   replies?: Comment[];
+  author_username?: string;
+  author_avatar_url?: string;
+  post_title?: string;
+  post_slug?: string;
+  artist_name?: string;
+  artist_slug?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -140,4 +146,11 @@ export interface ApiToken {
   created_at: string;
   last_used_at?: string;
   token?: string;
+}
+
+export interface UserProfileData {
+  user: User;
+  comments: Comment[];
+  favorite_artists: Artist[];
+  favorite_posts: Post[];
 }

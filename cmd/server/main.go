@@ -63,7 +63,7 @@ func main() {
 	artistRepo := repository.NewArtistRepo(pool, store)
 	postRepo := repository.NewPostRepo(pool, store)
 	tagRepo := repository.NewTagRepo(pool)
-	commentRepo := repository.NewCommentRepo(pool)
+	commentRepo := repository.NewCommentRepo(pool, store)
 	userRepo := repository.NewUserRepo(pool, store)
 	favoriteRepo := repository.NewFavoriteRepo(pool, store)
 	settingsRepo := repository.NewSettingsRepo(pool)
