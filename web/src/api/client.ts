@@ -45,7 +45,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       try {
         return await res.json();
       } catch (e) {
-        throw new ApiError('Failed to parse server response as valid JSON. Please verify your Ekokan server binary is updated.', 500);
+        let rawText = '';
+        try {
+          rawText = await res.clone().text();
+        } catch (_) {}
+        console.error('API JSON parse error:', e, 'Raw body:', rawText);
+        const parseMsg = (e as Error)?.message || 'Invalid JSON format';
+        throw new ApiError(`Failed to parse server response as valid JSON (${parseMsg}). ${rawText ? `Preview: ${rawText.slice(0, 150)}` : ''}`, 500);
       }
     } catch (err: unknown) {
       lastError = err;
