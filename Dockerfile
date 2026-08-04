@@ -12,15 +12,14 @@ RUN npm run build
 # ==========================================
 # Stage 2: Build Go Backend (with OpenDAL)
 # ==========================================
-FROM golang:1.22-bookworm AS backend-builder
+FROM golang:1.25-bookworm AS backend-builder
 WORKDIR /app
-ENV GOTOOLCHAIN=auto
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY migrations/ migrations/
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o ekokan-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ekokan-server ./cmd/server
 
 # ==========================================
 # Stage 3: Final Production Runner Image
