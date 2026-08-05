@@ -317,7 +317,7 @@ func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 // MassDelete removes multiple posts in a single atomic SQL query
 func (r *PostRepo) MassDelete(ctx context.Context, ids []uuid.UUID) (int64, error) {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM posts WHERE id = ANY($1)`, ids)
+	tag, err := r.pool.Exec(ctx, `DELETE FROM posts WHERE id = ANY($1::uuid[])`, ids)
 	if err != nil {
 		return 0, fmt.Errorf("mass deleting posts: %w", err)
 	}
@@ -484,7 +484,7 @@ func (r *PostRepo) loadFirstMediaBatch(ctx context.Context, postIDs []uuid.UUID)
 		       f.width, f.height, f.duration_ms
 		FROM post_media pm
 		JOIN files f ON f.id = pm.file_id
-		WHERE pm.post_id = ANY($1)
+		WHERE pm.post_id = ANY($1::uuid[])
 		ORDER BY pm.post_id, pm.sort_order ASC
 	`, postIDs)
 	if err != nil {
@@ -516,7 +516,7 @@ func (r *PostRepo) loadTagsBatch(ctx context.Context, postIDs []uuid.UUID) (map[
 		SELECT pt.post_id, t.id, t.name, t.slug, t.category, t.post_count
 		FROM tags t
 		JOIN post_tags pt ON pt.tag_id = t.id
-		WHERE pt.post_id = ANY($1)
+		WHERE pt.post_id = ANY($1::uuid[])
 		ORDER BY t.name ASC
 	`, postIDs)
 	if err != nil {

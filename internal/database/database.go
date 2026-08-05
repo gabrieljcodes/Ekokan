@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxUUID "github.com/vgarvardt/pgx-google-uuid/v5"
 )
 
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
@@ -19,6 +21,11 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	config.MaxConnLifetime = 1 * time.Hour
 	config.MaxConnIdleTime = 30 * time.Minute
 	config.HealthCheckPeriod = 30 * time.Second
+
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		pgxUUID.Register(conn.TypeMap())
+		return nil
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
