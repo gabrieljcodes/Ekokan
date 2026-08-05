@@ -60,7 +60,7 @@ func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 		return nil, fmt.Errorf("unknown storage backend: %s", cfg.StorageBackend)
 	}
 
-	op, err := opendal.NewOperator(scheme, options)
+	op, err := opendal.NewOperator(scheme, options, opendal.WithTimeout(operatorMetaTimeout, operatorIOTimeout))
 	if err != nil {
 		return nil, fmt.Errorf("creating opendal operator for %s: %w", cfg.StorageBackend, err)
 	}
@@ -91,6 +91,13 @@ func NewStore(cfg *config.Config) (*OpenDALStore, error) {
 // to prevent thread starvation on smaller VPS instances while scaling throughput on multi-core servers.
 var ffiSem = initFFISemaphore()
 
+const (
+	operatorMetaTimeout = 10 * time.Second
+	operatorIOTimeout   = 25 * time.Second
+	ffiOpTimeout        = operatorIOTimeout + 5*time.Second
+	ThumbnailGenTimeout = 20 * time.Second
+)
+
 func initFFISemaphore() chan struct{} {
 	cpus := runtime.GOMAXPROCS(0)
 	// Reserve at least 2 cores unblocked exclusively for HTTP server traffic and Postgres networking.
@@ -103,48 +110,71 @@ func initFFISemaphore() chan struct{} {
 	return make(chan struct{}, limit)
 }
 
-func (s *OpenDALStore) Put(ctx context.Context, key string, data []byte) error {
+// runFFI executes a blocking OpenDAL native call bounded by ffiSem.
+// The semaphore slot is released only after fn genuinely returns to prevent FFI thread starvation.
+func runFFI[T any](ctx context.Context, op, key string, fn func() (T, error)) (T, error) {
+	var zero T
+
+	waitCtx, cancel := context.WithTimeout(ctx, ffiOpTimeout)
+	defer cancel()
+
 	select {
 	case ffiSem <- struct{}{}:
-		defer func() { <-ffiSem }()
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-waitCtx.Done():
+		return zero, waitCtx.Err()
 	}
-	return s.op.Write(key, data)
+
+	type result struct {
+		val T
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		v, err := fn()
+		done <- result{v, err}
+		<-ffiSem // released only once fn has actually returned - keeps real concurrency bounded
+	}()
+
+	select {
+	case res := <-done:
+		return res.val, res.err
+	case <-waitCtx.Done():
+		if ctx.Err() != nil {
+			return zero, ctx.Err()
+		}
+		slog.Warn("storage: FFI call still running past deadline; native operator timeout will bound it",
+			"op", op, "key", key, "deadline", ffiOpTimeout)
+		return zero, fmt.Errorf("storage %s exceeded %s waiting on native layer: %s", op, ffiOpTimeout, key)
+	}
+}
+
+func (s *OpenDALStore) Put(ctx context.Context, key string, data []byte) error {
+	_, err := runFFI(ctx, "put", key, func() (struct{}, error) {
+		return struct{}{}, s.op.Write(key, data)
+	})
+	return err
 }
 
 func (s *OpenDALStore) Get(ctx context.Context, key string) ([]byte, error) {
-	select {
-	case ffiSem <- struct{}{}:
-		defer func() { <-ffiSem }()
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-	return s.op.Read(key)
+	return runFFI(ctx, "get", key, func() ([]byte, error) {
+		return s.op.Read(key)
+	})
 }
 
 func (s *OpenDALStore) Delete(ctx context.Context, key string) error {
-	select {
-	case ffiSem <- struct{}{}:
-		defer func() { <-ffiSem }()
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	return s.op.Delete(key)
+	_, err := runFFI(ctx, "delete", key, func() (struct{}, error) {
+		return struct{}{}, s.op.Delete(key)
+	})
+	return err
 }
 
 func (s *OpenDALStore) Exists(ctx context.Context, key string) (bool, error) {
-	select {
-	case ffiSem <- struct{}{}:
-		defer func() { <-ffiSem }()
-	case <-ctx.Done():
-		return false, ctx.Err()
-	}
-	_, err := s.op.Stat(key)
-	if err == nil {
+	return runFFI(ctx, "exists", key, func() (bool, error) {
+		if _, err := s.op.Stat(key); err != nil {
+			return false, nil
+		}
 		return true, nil
-	}
-	return false, nil
+	})
 }
 
 func (s *OpenDALStore) PublicURL(key string) string {
@@ -169,13 +199,13 @@ func (s *OpenDALStore) PublicURL(key string) string {
 func (s *OpenDALStore) ServeFile(w http.ResponseWriter, r *http.Request, key string) {
 	if strings.HasSuffix(key, ".thumb.jpg") {
 		exists, err := s.Exists(r.Context(), key)
-		if err == nil && !exists {
-			origKey := strings.TrimSuffix(key, ".thumb.jpg")
-			if origBytes, origErr := s.Get(r.Context(), origKey); origErr == nil {
-				if thumbBytes, genErr := GenerateThumbnail(r.Context(), origBytes, filepath.Base(origKey)); genErr == nil {
-					_ = s.Put(r.Context(), key, thumbBytes)
-				}
-			}
+		if err != nil {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		if !exists {
+			s.serveGeneratedThumbnail(w, r, key)
+			return
 		}
 	}
 
@@ -189,7 +219,40 @@ func (s *OpenDALStore) ServeFile(w http.ResponseWriter, r *http.Request, key str
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
+	s.writeFile(w, r, key, data)
+}
 
+// serveGeneratedThumbnail generates a missing thumbnail on demand and serves it directly
+// from memory, then persists it to storage asynchronously.
+func (s *OpenDALStore) serveGeneratedThumbnail(w http.ResponseWriter, r *http.Request, thumbKey string) {
+	origKey := strings.TrimSuffix(thumbKey, ".thumb.jpg")
+
+	origBytes, err := s.Get(r.Context(), origKey)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	genCtx, cancel := context.WithTimeout(r.Context(), ThumbnailGenTimeout)
+	thumbBytes, err := GenerateThumbnail(genCtx, origBytes, filepath.Base(origKey))
+	cancel()
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	go func() {
+		putCtx, cancel := context.WithTimeout(context.Background(), ffiOpTimeout)
+		defer cancel()
+		if err := s.Put(putCtx, thumbKey, thumbBytes); err != nil {
+			slog.Warn("storage: failed to persist generated thumbnail", "key", thumbKey, "error", err)
+		}
+	}()
+
+	s.writeFile(w, r, thumbKey, thumbBytes)
+}
+
+func (s *OpenDALStore) writeFile(w http.ResponseWriter, r *http.Request, key string, data []byte) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if strings.HasSuffix(key, ".thumb.jpg") || strings.HasPrefix(http.DetectContentType(data), "image/") || strings.HasPrefix(http.DetectContentType(data), "video/") {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filepath.Base(key)))
@@ -243,7 +306,10 @@ func ProcessUpload(ctx context.Context, store *OpenDALStore, filename string, re
 		if err := store.Put(ctx, storagePath, data); err != nil {
 			return nil, fmt.Errorf("storing file: %w", err)
 		}
-		if thumbBytes, err := GenerateThumbnail(ctx, data, filename); err == nil {
+		genCtx, cancel := context.WithTimeout(ctx, ThumbnailGenTimeout)
+		thumbBytes, thumbErr := GenerateThumbnail(genCtx, data, filename)
+		cancel()
+		if thumbErr == nil {
 			_ = store.Put(ctx, storagePath+".thumb.jpg", thumbBytes)
 		}
 	}
